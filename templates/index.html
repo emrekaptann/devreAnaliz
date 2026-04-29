@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devre Analiz - Pro Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard">
+        <header class="top-bar">
+            <div class="logo">
+                <span class="icon">⚡</span>
+                <h1>Devre<span>Analiz</span></h1>
+            </div>
+            <div class="user-info">2003240044 ABDURRAHİM EMRE KAPTAN</div>
+            <div class="top-controls">
+                <div class="mode-selector">
+                    <button id="dc-mode" class="active">DC Analizi</button>
+                    <button id="ac-mode">AC Analizi</button>
+                </div>
+                <button id="theme-toggle" class="theme-toggle" title="Temayı Değiştir">🌓</button>
+                <button id="solve-btn" class="solve-btn pulse">Hesapla</button>
+            </div>
+        </header>
+
+        <div class="content-wrapper">
+            <!-- Sidebar Left: Config -->
+            <aside class="sidebar-left glass">
+                <section class="config-section">
+                    <h2>Araç Gereçler</h2>
+                    <div class="toolbar" id="component-toolbar">
+                        <div class="tool" draggable="true" data-type="R" title="Direnç">
+                            <span class="tool-icon">〰️</span>
+                            <span>Direnç</span>
+                        </div>
+                        <div class="tool" draggable="true" data-type="C" title="Kondansatör">
+                            <span class="tool-icon">| |</span>
+                            <span>Kondansatör</span>
+                        </div>
+                        <div class="tool" draggable="true" data-type="L" title="Bobin">
+                            <span class="tool-icon">➰</span>
+                            <span>Bobin</span>
+                        </div>
+                        <div class="tool" draggable="true" data-type="V" title="Gerilim Kaynağı">
+                            <span class="tool-icon">Ⓥ</span>
+                            <span>Gerilim</span>
+                        </div>
+                        <div class="tool" draggable="true" data-type="I" title="Akım Kaynağı">
+                            <span class="tool-icon">Ⓘ</span>
+                            <span>Akım</span>
+                        </div>
+                        <div class="tool" id="wire-tool" title="Bağlantı Kablosu">
+                            <span class="tool-icon">🔌</span>
+                            <span>Kablo (Jumper)</span>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="divider">
+
+                <section class="list-section">
+                    <h2>Eleman Listesi</h2>
+                    <div id="component-list" class="list-container">
+                        <p class="empty-msg">Devrenizi oluşturun...</p>
+                    </div>
+                    <button id="clear-btn" class="clear-btn">Tümünü Temizle</button>
+                </section>
+            </aside>
+
+            <!-- Main Central Content: Schematic -->
+            <main class="main-canvas glass">
+                <div class="canvas-header">
+                    <h2>Devre Şeması</h2>
+                    <span class="hint">Elemanları otomatik olarak yerleştirir</span>
+                </div>
+                <div id="schematic-container">
+                    <svg id="schematic-svg" width="100%" height="100%">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="var(--primary)" />
+                            </marker>
+                        </defs>
+                    </svg>
+                </div>
+                <div id="freq-config" class="ac-settings glass hidden">
+                    <label>AC Frekans (Hz):</label>
+                    <input type="number" id="circuit-freq" value="1000">
+                </div>
+            </main>
+
+            <!-- Sidebar Right: Results -->
+            <aside class="sidebar-right glass">
+                <section class="results-section">
+                    <h2>Analiz Sonuçları</h2>
+                    <div id="results-content">
+                        <div class="placeholder-results">
+                            <div class="pulse-icon">📊</div>
+                            <p>Sonuçlar burada görünecek.</p>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-content glass">
+            <h3>Elemanı Düzenle</h3>
+            <div class="input-group">
+                <label>İsim</label>
+                <input type="text" id="edit-name">
+            </div>
+                <div class="form-group">
+                    <label>Değer</label>
+                    <div class="input-row">
+                        <input type="number" id="edit-value-num" step="any" placeholder="1.0">
+                        <select id="edit-value-unit">
+                            <option value="">-</option>
+                            <option value="p">p (piko)</option>
+                            <option value="n">n (nano)</option>
+                            <option value="u">u (mikro)</option>
+                            <option value="m">m (mili)</option>
+                            <option value="k">k (kilo)</option>
+                            <option value="M">M (mega)</option>
+                        </select>
+                        <span id="unit-label" class="unit-suffix">Ω</span>
+                    </div>
+                </div>
+            <div id="edit-phase-group" class="input-group hidden">
+                <label>Faz (°)</label>
+                <input type="number" id="edit-phase">
+            </div>
+            <div class="modal-actions">
+                <button id="modal-delete" class="delete-btn">Sil</button>
+                <button id="modal-save" class="save-btn">Kaydet</button>
+                <button id="modal-close" class="close-btn">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
