@@ -49,6 +49,7 @@ def parse_value(val_str):
 @app.route('/solve', methods=['POST'])
 def solve_circuit():
     data = request.json
+    print("DEBUG: Received payload:", data)
     try:
         circuit = Circuit()
         freq = data.get('frequency', 0)
@@ -120,7 +121,21 @@ def solve_circuit():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        err_msg = str(e)
+        # Basit çeviri eşleştirmeleri
+        translations = {
+            "could not convert string to float": "Geçersiz sayısal değer girildi",
+            "is not in list": "eleman listede bulunamadı",
+            "Matrix is singular": "Matris tekil (devre tamamlanmamış olabilir)",
+            "n1": "n1 bağlantısı eksik",
+            "n2": "n2 bağlantısı eksik",
+            "value": "değer alanı eksik"
+        }
+        for eng, tr in translations.items():
+            if eng in err_msg:
+                err_msg = tr
+                break
+        return jsonify({'error': err_msg}), 400
 
 if __name__ == '__main__':
     import os

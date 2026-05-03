@@ -1,3 +1,5 @@
+let templateCounter = 0;
+
 class SchematicRenderer {
     constructor(svgId) {
         this.svg = document.getElementById(svgId);
@@ -9,15 +11,26 @@ class SchematicRenderer {
         this.draggingComp = null;
         this.dragOffset = { x: 0, y: 0 };
         this.gridSize = 20;
+        this.selectedIds = new Set();
+        this.selectedWireIndices = new Set();
+        this.isSelecting = false;
+        this.selectionStart = { x: 0, y: 0 };
+        this.selectionEnd = { x: 0, y: 0 };
+        this.lastNodeMap = null; // Store node mapping for labels
         this.setupEvents();
     }
 
     setupEvents() {
-        this.svg.addEventListener('dragover', (e) => e.preventDefault());
+        this.svg.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
         this.svg.addEventListener('drop', (e) => this.handleDrop(e));
+        this.svg.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.svg.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.svg.addEventListener('mouseup', () => this.stopDragging());
         this.svg.addEventListener('click', (e) => this.handleClick(e));
+        window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
 
     snap(val) {
@@ -27,11 +40,18 @@ class SchematicRenderer {
     handleDrop(e) {
         e.preventDefault();
         const type = e.dataTransfer.getData('comp-type');
-        if (!type) return;
-
+        const template = e.dataTransfer.getData('template-type');
+        
         const rect = this.svg.getBoundingClientRect();
         const x = this.snap(e.clientX - rect.left);
         const y = this.snap(e.clientY - rect.top);
+
+        if (template) {
+            this.loadTemplate(template, x, y);
+            return;
+        }
+
+        if (!type) return;
 
         const compId = Date.now();
         const n1 = `n_${compId}_1`;
@@ -56,6 +76,85 @@ class SchematicRenderer {
         this.render();
     }
 
+    loadTemplate(type, x, y) {
+        templateCounter++;
+        const tpl = {
+            series: {
+                comps: [
+                    { type: 'V', name: 'V', val: '12', dx: -60, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R', val: '1k', dx: 60, dy: 0, rot: 90 }
+                ],
+                wires: [
+                    { n1: 0, p1: 1, n2: 1, p2: 1 },
+                    { n1: 0, p1: 2, n2: 1, p2: 2 }
+                ]
+            },
+            parallel: {
+                comps: [
+                    { type: 'V', name: 'V', val: '10', dx: -80, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R', val: '2k', dx: 0, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R', val: '2k', dx: 80, dy: 0, rot: 90 }
+                ],
+                wires: [
+                    { n1: 0, p1: 1, n2: 1, p2: 1 }, { n1: 1, p1: 1, n2: 2, p2: 1 },
+                    { n1: 0, p1: 2, n2: 1, p2: 2 }, { n1: 1, p1: 2, n2: 2, p2: 2 }
+                ]
+            },
+            bridge: {
+                comps: [
+                    { type: 'V', name: 'V', val: '10', dx: -120, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R', val: '1k', dx: -40, dy: -40, rot: 0 },
+                    { type: 'R', name: 'R', val: '1k', dx: 40, dy: -40, rot: 0 },
+                    { type: 'R', name: 'R', val: '1k', dx: -40, dy: 40, rot: 0 },
+                    { type: 'R', name: 'R', val: '1k', dx: 40, dy: 40, rot: 0 },
+                    { type: 'R', name: 'R', val: '1k', dx: 0, dy: 0, rot: 90 }
+                ],
+                wires: [
+                    { n1: 0, p1: 1, n2: 1, p2: 1 }, { n1: 1, p1: 1, n2: 2, p2: 1 },
+                    { n1: 1, p1: 2, n2: 5, p2: 1 }, { n1: 2, p1: 2, n2: 5, p2: 2 },
+                    { n1: 5, p1: 1, n2: 3, p2: 1 }, { n1: 5, p1: 2, n2: 4, p2: 1 },
+                    { n1: 3, p1: 2, n2: 4, p2: 2 }, { n1: 4, p1: 2, n2: 0, p2: 2 }
+                ]
+            }
+        };
+
+        const config = tpl[type];
+        if (!config) return;
+
+        const newComps = config.comps.map((c, idx) => {
+            const id = Date.now() + idx + (templateCounter * 100);
+            const cx = x + c.dx;
+            const cy = y + c.dy;
+            const n1 = `n_${id}_1`;
+            const n2 = `n_${id}_2`;
+            
+            if (c.rot === 90) {
+                this.nodes[n1] = { x: cx, y: cy - 40 };
+                this.nodes[n2] = { x: cx, y: cy + 40 };
+            } else {
+                this.nodes[n1] = { x: cx - 40, y: cy };
+                this.nodes[n2] = { x: cx + 40, y: cy };
+            }
+
+            return { 
+                id, 
+                type: c.type, 
+                name: `${c.name}${this.components.length + idx + 1}`, 
+                value: c.val, 
+                n1, n2, x: cx, y: cy, phase: 0 
+            };
+        });
+
+        config.wires.forEach(w => {
+            const node1 = w.p1 === 1 ? newComps[w.n1].n1 : newComps[w.n1].n2;
+            const node2 = w.p2 === 1 ? newComps[w.n2].n1 : newComps[w.n2].n2;
+            this.wires.push({ n1: node1, n2: node2 });
+        });
+
+        this.components.push(...newComps);
+        this.render();
+    }
+
     handleMouseMove(e) {
         const rect = this.svg.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -66,14 +165,32 @@ class SchematicRenderer {
             const dy = this.snap(y + this.dragOffset.y) - this.draggingComp.y;
 
             if (dx !== 0 || dy !== 0) {
-                this.draggingComp.x += dx;
-                this.draggingComp.y += dy;
-                this.nodes[this.draggingComp.n1].x += dx;
-                this.nodes[this.draggingComp.n1].y += dy;
-                this.nodes[this.draggingComp.n2].x += dx;
-                this.nodes[this.draggingComp.n2].y += dy;
+                const compsToMove = this.selectedIds.has(this.draggingComp.id) ? 
+                                    this.components.filter(c => this.selectedIds.has(c.id)) : 
+                                    [this.draggingComp];
+                
+                const affectedNodes = new Set();
+                compsToMove.forEach(c => {
+                    c.x += dx;
+                    c.y += dy;
+                    affectedNodes.add(c.n1);
+                    affectedNodes.add(c.n2);
+                });
+
+                affectedNodes.forEach(nid => {
+                    this.nodes[nid].x += dx;
+                    this.nodes[nid].y += dy;
+                });
+
                 this.render();
             }
+            return;
+        }
+
+        if (this.isSelecting) {
+            this.selectionEnd = { x, y };
+            this.updateSelection();
+            this.render();
             return;
         }
 
@@ -116,16 +233,97 @@ class SchematicRenderer {
         }
     }
 
+    handleMouseDown(e) {
+        const rect = this.svg.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // If clicking background or grid dot, start selection
+        if (e.target === this.svg || e.target.classList.contains('dot')) {
+            this.isSelecting = true;
+            this.selectionStart = { x, y };
+            this.selectionEnd = { x, y };
+            if (!e.shiftKey) {
+                this.selectedIds.clear();
+                this.selectedWireIndices.clear();
+            }
+            this.render();
+        }
+    }
+
+    updateSelection() {
+        const x1 = Math.min(this.selectionStart.x, this.selectionEnd.x);
+        const y1 = Math.min(this.selectionStart.y, this.selectionEnd.y);
+        const x2 = Math.max(this.selectionStart.x, this.selectionEnd.x);
+        const y2 = Math.max(this.selectionStart.y, this.selectionEnd.y);
+
+        this.components.forEach(c => {
+            if (c.x > x1 && c.x < x2 && c.y > y1 && c.y < y2) {
+                this.selectedIds.add(c.id);
+            }
+        });
+
+        this.wires.forEach((w, idx) => {
+            const p1 = this.nodes[w.n1];
+            const p2 = this.nodes[w.n2];
+            if (!p1 || !p2) return; // Safety check
+            if (p1.x > x1 && p1.x < x2 && p1.y > y1 && p1.y < y2 &&
+                p2.x > x1 && p2.x < x2 && p2.y > y1 && p2.y < y2) {
+                this.selectedWireIndices.add(idx);
+            }
+        });
+    }
+
+    handleKeyDown(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (this.selectedIds.size > 0 || this.selectedWireIndices.size > 0) {
+                // Delete selected components and their wires
+                const deletedCompNodeIds = new Set();
+                this.components.forEach(c => {
+                    if (this.selectedIds.has(c.id)) {
+                        deletedCompNodeIds.add(c.n1);
+                        deletedCompNodeIds.add(c.n2);
+                    }
+                });
+
+                this.components = this.components.filter(c => !this.selectedIds.has(c.id));
+                
+                // Delete selected wires OR wires connected to deleted components
+                this.wires = this.wires.filter((w, idx) => {
+                    if (this.selectedWireIndices.has(idx)) return false;
+                    if (deletedCompNodeIds.has(w.n1) || deletedCompNodeIds.has(w.n2)) return false;
+                    return true;
+                });
+
+                this.selectedIds.clear();
+                this.selectedWireIndices.clear();
+                this.lastNodeMap = null; // Clear labels
+                this.render();
+                clearResults(); // Reset results panel
+            }
+        }
+    }
+
     startDragging(comp, e) {
         if (this.isWiring) return;
         this.draggingComp = comp;
         const rect = this.svg.getBoundingClientRect();
         this.dragOffset.x = comp.x - (e.clientX - rect.left);
         this.dragOffset.y = comp.y - (e.clientY - rect.top);
+
+        if (!this.selectedIds.has(comp.id)) {
+            if (!e.shiftKey) {
+                this.selectedIds.clear();
+                this.selectedWireIndices.clear();
+            }
+            this.selectedIds.add(comp.id);
+        }
     }
 
     stopDragging() {
         this.draggingComp = null;
+        this.isSelecting = false;
+        this.render();
     }
 
     render() {
@@ -139,20 +337,39 @@ class SchematicRenderer {
                 const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
                 dot.setAttribute("cx", i); dot.setAttribute("cy", j);
                 dot.setAttribute("r", "0.5"); dot.setAttribute("fill", "var(--border)");
+                dot.setAttribute("class", "dot");
                 this.svg.appendChild(dot);
             }
         }
 
+        // Draw Selection Box
+        if (this.isSelecting) {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            const x = Math.min(this.selectionStart.x, this.selectionEnd.x);
+            const y = Math.min(this.selectionStart.y, this.selectionEnd.y);
+            const w = Math.abs(this.selectionStart.x - this.selectionEnd.x);
+            const h = Math.abs(this.selectionStart.y - this.selectionEnd.y);
+            rect.setAttribute("x", x); rect.setAttribute("y", y);
+            rect.setAttribute("width", w); rect.setAttribute("height", h);
+            rect.setAttribute("fill", "rgba(0, 123, 255, 0.1)");
+            rect.setAttribute("stroke", "var(--primary)");
+            rect.setAttribute("stroke-dasharray", "4");
+            this.svg.appendChild(rect);
+        }
+
         // Draw wires
-        this.wires.forEach(w => {
+        this.wires.forEach((w, idx) => {
             const p1 = this.nodes[w.n1];
             const p2 = this.nodes[w.n2];
             if (p1 && p2) {
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 line.setAttribute("x1", p1.x); line.setAttribute("y1", p1.y);
                 line.setAttribute("x2", p2.x); line.setAttribute("y2", p2.y);
-                line.setAttribute("stroke", "var(--primary)");
-                line.setAttribute("stroke-width", "2");
+                line.setAttribute("stroke", this.selectedWireIndices.has(idx) ? "var(--secondary)" : "var(--primary)");
+                line.setAttribute("stroke-width", this.selectedWireIndices.has(idx) ? "4" : "2");
+                if (this.selectedWireIndices.has(idx)) {
+                    line.style.filter = "drop-shadow(0 0 5px var(--secondary))";
+                }
                 this.svg.appendChild(line);
             }
         });
@@ -165,6 +382,40 @@ class SchematicRenderer {
         });
 
         updateSidebarComponentList(this.components);
+
+        // Draw node points and labels (Drawn last to be on top)
+        const usedNodeIds = new Set();
+        this.components.forEach(c => { usedNodeIds.add(c.n1); usedNodeIds.add(c.n2); });
+        this.wires.forEach(w => { usedNodeIds.add(w.n1); usedNodeIds.add(w.n2); });
+
+        const activeNodes = this.lastNodeMap ? Object.keys(this.lastNodeMap) : Array.from(usedNodeIds);
+        activeNodes.forEach(nid => {
+            const p = this.nodes[nid];
+            if (!p) return;
+            const nodeName = this.lastNodeMap ? this.lastNodeMap[nid] : null;
+
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
+            circle.setAttribute("r", nodeName ? "8" : "4"); // Increased r for visibility
+            circle.setAttribute("class", "node-point");
+            circle.setAttribute("data-node-id", nid);
+            if (nodeName) circle.setAttribute("data-node-group", nodeName);
+            
+            // Ground node special color
+            if (nodeName === '0') circle.style.stroke = "var(--secondary)";
+
+            this.svg.appendChild(circle);
+
+            if (nodeName) {
+                const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                label.textContent = nodeName === '0' ? 'GND' : nodeName;
+                label.setAttribute("x", p.x + 10);
+                label.setAttribute("y", p.y - 10);
+                label.setAttribute("class", "node-label-svg");
+                if (nodeName === '0') label.style.fill = "var(--secondary)";
+                this.svg.appendChild(label);
+            }
+        });
     }
 
     drawComponent(c, p1, p2) {
@@ -198,6 +449,11 @@ class SchematicRenderer {
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("class", "comp-symbol");
+        if (this.selectedIds.has(c.id)) {
+            path.style.stroke = "var(--secondary)";
+            path.style.strokeWidth = "3px";
+            path.style.filter = "drop-shadow(0 0 8px var(--secondary))";
+        }
         let d = "";
         if (c.type === 'R') d = "M -15,0 L -12,-5 L -6,5 L 0,-5 L 6,5 L 12,-5 L 15,0";
         else if (c.type === 'C') d = "M -4,-10 L -4,10 M 4,-10 L 4,10 M -15,0 L -4,0 M 4,0 L 15,0";
@@ -230,10 +486,23 @@ class SchematicRenderer {
     getMNAComponents() {
         const nodeMap = {}; 
         const groups = [];
-        const allNodeIds = Object.keys(this.nodes);
-        if (allNodeIds.length === 0) return [];
+        
+        // Only consider nodes that are actually used by current components or wires
+        const usedNodeIds = new Set();
+        this.components.forEach(c => {
+            usedNodeIds.add(c.n1);
+            usedNodeIds.add(c.n2);
+        });
+        this.wires.forEach(w => {
+            usedNodeIds.add(w.n1);
+            usedNodeIds.add(w.n2);
+        });
 
-        allNodeIds.forEach(n => groups.push(new Set([n])));
+        if (usedNodeIds.size === 0) return [];
+
+        const activeNodes = Array.from(usedNodeIds);
+        activeNodes.forEach(n => groups.push(new Set([n])));
+        
         this.wires.forEach(w => {
             let g1 = groups.find(g => g.has(w.n1));
             let g2 = groups.find(g => g.has(w.n2));
@@ -248,7 +517,7 @@ class SchematicRenderer {
         let lowestY = -Infinity;
         groups.forEach(g => {
             g.forEach(nid => {
-                if (this.nodes[nid].y > lowestY) {
+                if (this.nodes[nid] && this.nodes[nid].y > lowestY) {
                     lowestY = this.nodes[nid].y;
                     gndGroup = g;
                 }
@@ -260,11 +529,25 @@ class SchematicRenderer {
             g.forEach(n => nodeMap[n] = name);
         });
 
+        this.lastNodeMap = nodeMap; // Save for rendering labels
         return this.components.map(c => ({
             ...c,
             n1: nodeMap[c.n1],
             n2: nodeMap[c.n2]
         }));
+    }
+
+    highlightNodeGroup(groupName, active) {
+        const points = this.svg.querySelectorAll(`[data-node-group="${groupName}"]`);
+        points.forEach(p => {
+            if (active) {
+                p.classList.add('active-highlight');
+                p.setAttribute('r', '12');
+            } else {
+                p.classList.remove('active-highlight');
+                p.setAttribute('r', '6');
+            }
+        });
     }
 }
 
@@ -279,6 +562,13 @@ document.addEventListener('DOMContentLoaded', () => {
     tools.forEach(t => {
         t.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('comp-type', t.dataset.type);
+        });
+    });
+
+    const templates = document.querySelectorAll('.template-item[draggable="true"]');
+    templates.forEach(t => {
+        t.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('template-type', t.dataset.template);
         });
     });
 
@@ -330,6 +620,8 @@ document.addEventListener('DOMContentLoaded', () => {
             components: mnaComps
         };
 
+        console.log("DEBUG: Sending payload to /solve:", payload);
+
         const solveBtn = document.getElementById('solve-btn');
         solveBtn.disabled = true;
         solveBtn.innerText = 'Hesaplanıyor...';
@@ -341,9 +633,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
-            if (data.error) alert(data.error);
-            else displayResults(data);
+            if (data.error) {
+                console.error("DEBUG: Server returned error:", data.error);
+                alert("Analiz Hatası: " + data.error);
+            } else {
+                displayResults(data);
+                renderer.render(); // Ensure labels appear immediately
+            }
         } catch (e) {
+            console.error("DEBUG: Fetch error:", e);
             alert('Sunucu hatası');
         } finally {
             solveBtn.disabled = false;
@@ -356,7 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.components = [];
         renderer.nodes = {};
         renderer.wires = [];
+        renderer.lastNodeMap = null;
         renderer.render();
+        clearResults();
     });
     
     // Theme Toggle (re-applied logic)
@@ -418,19 +718,133 @@ function updateSidebarComponentList(components) {
     `).join('');
 }
 
+function parseValue(valStr) {
+    if (typeof valStr !== 'string') return parseFloat(valStr);
+    valStr = valStr.trim().toLowerCase();
+    const suffixes = { 'k': 1e3, 'm': 1e-3, 'u': 1e-6, 'n': 1e-9, 'p': 1e-12, 'meg': 1e6 };
+    for (const [s, m] of Object.entries(suffixes)) {
+        if (valStr.endsWith(s)) return parseFloat(valStr.slice(0, -s.length)) * m;
+    }
+    return parseFloat(valStr);
+}
+
 function displayResults(data) {
     const resultsContent = document.getElementById('results-content');
-    let html = `<h3>Sonuçlar</h3><div class="result-grid">`;
+    const components = renderer.getMNAComponents();
+    const voltages = data.voltages;
+    const currents = data.currents;
     
-    for (const [node, info] of Object.entries(data.voltages)) {
+    let totalConsumed = 0;
+    let totalSupplied = 0;
+
+    let html = ``;
+
+    // Components Section
+    html += `<h3 class="result-section-title">Eleman Analizi</h3>`;
+    components.forEach(c => {
+        const v1 = voltages[c.n1]?.mag || 0;
+        const v2 = voltages[c.n2]?.mag || 0;
+        const vDrop = v1 - v2;
+        
+        let i = 0;
+        let p = 0;
+        let explanation = "";
+        let status = "consuming";
+        let statusText = "Tüketiyor";
+
+        if (c.type === 'R') {
+            const r = parseValue(c.value);
+            i = Math.abs(vDrop / r);
+            p = vDrop * (v1 - v2) / r; // P = V^2 / R
+            p = Math.abs(p);
+            totalConsumed += p;
+            explanation = `Bu direnç üzerinden ${i.toFixed(4)}A akım akıyor. ${p.toFixed(4)}W enerjiyi ısıya dönüştürüyor.`;
+        } else if (c.type === 'V') {
+            const srcCurrent = currents[c.name]?.real || 0;
+            // Power delivered by voltage source: P = V * I_source
+            // In MNA, I_source is into n1. So P = -V * I_source if it delivers?
+            // Let's use magnitude for simplicity in "beginner mode" but check direction
+            i = Math.abs(srcCurrent);
+            p = Math.abs(parseValue(c.value) * i);
+            status = "delivering";
+            statusText = "Üretiyor";
+            totalSupplied += p;
+            explanation = `Bu kaynak devreye ${p.toFixed(2)}W güç sağlıyor. Voltajı sabit ${c.value}V'da tutuyor.`;
+        } else if (c.type === 'I') {
+            i = parseValue(c.value);
+            p = Math.abs(vDrop * i);
+            status = "delivering";
+            statusText = "Üretiyor";
+            totalSupplied += p;
+            explanation = `Bu akım kaynağı devreye ${p.toFixed(2)}W güç pompalıyor.`;
+        } else {
+            explanation = `${c.name} elemanı analiz edildi.`;
+        }
+
         html += `
-            <div class="node-card">
-                <h4>Düğüm ${node}</h4>
-                <span class="val">${info.mag.toFixed(4)}V</span>
+            <div class="comp-card ${status}">
+                <div class="comp-card-header">
+                    <span class="comp-id">${c.name}</span>
+                    <span class="status-badge ${status}">${statusText}</span>
+                </div>
+                <div class="comp-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Gerilim (ΔV)</span>
+                        <span class="metric-val">${Math.abs(vDrop).toFixed(3)} V</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Akım (I)</span>
+                        <span class="metric-val">${i.toFixed(4)} A</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Güç (P)</span>
+                        <span class="metric-val">${p.toFixed(4)} W</span>
+                    </div>
+                </div>
+                <p class="explanation-text">${explanation}</p>
+            </div>
+        `;
+    });
+
+    // Summary at the top
+    const summaryHtml = `
+        <div class="summary-card">
+            <h4>Sistem Güç Dengesi</h4>
+            <span class="summary-val">${totalSupplied.toFixed(2)} W Üretiliyor</span>
+            <span class="summary-note">Devredeki kaynaklar toplam ${totalSupplied.toFixed(4)}W güç sağlıyor.</span>
+        </div>
+    `;
+
+    // Nodes Section
+    let nodesHtml = `<h3 class="result-section-title">Düğüm Gerilimleri</h3>`;
+    for (const [node, info] of Object.entries(voltages)) {
+        const isGnd = node === '0';
+        const displayName = isGnd ? "Referans (GND)" : `Düğüm ${node}`;
+        const cardClass = isGnd ? "node-card gnd" : "node-card";
+        
+        nodesHtml += `
+            <div class="${cardClass}" 
+                 onmouseenter="renderer.highlightNodeGroup('${node}', true)" 
+                 onmouseleave="renderer.highlightNodeGroup('${node}', false)">
+                <div class="node-info-main">
+                    <h4>${displayName}</h4>
+                    <span class="node-usage">${isGnd ? "0V Referans Noktası" : "Ölçülen Potansiyel"}</span>
+                </div>
+                <span class="val">${info.mag.toFixed(3)} V</span>
             </div>
         `;
     }
-    
-    html += `</div>`;
-    resultsContent.innerHTML = html;
+
+    resultsContent.innerHTML = summaryHtml + nodesHtml + html;
+}
+
+function clearResults() {
+    const resultsContent = document.getElementById('results-content');
+    if (!resultsContent) return;
+    resultsContent.innerHTML = `
+        <div class="placeholder-results">
+            <div class="pulse-icon">📊</div>
+            <p>Sonuçlar burada görünecek.</p>
+        </div>
+    `;
 }

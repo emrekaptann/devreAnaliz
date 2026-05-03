@@ -25,7 +25,7 @@ class MatrixSolver:
             
             # Pivot value check
             if abs(A[i][i]) < 1e-18:
-                raise ValueError("Matrix is singular or near-singular.")
+                raise ValueError("Birden Fazla Devre Tespit Edildi!")
                 
             # Eliminate column below pivot
             for k in range(i + 1, n):
@@ -184,7 +184,7 @@ class Circuit:
         try:
             results = MatrixSolver.solve(matrix, b)
         except ValueError as e:
-            return f"Error: {e}"
+            return f"Hata: {e}"
 
         # Parse results
         node_voltages = {n: results[nodes_map[n]] if nodes_map[n] != -1 else 0.0 for n in self.nodes}
