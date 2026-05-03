@@ -421,7 +421,14 @@ input:focus, select:focus { border-color: var(--primary); }
 }
 
 /* SVG Components */
-.node-point { fill: var(--bg-canvas); stroke: var(--primary); stroke-width: 2px; transition: all 0.3s; cursor: pointer; }
+.node-point { 
+    fill: var(--bg-canvas); 
+    stroke: var(--primary); 
+    stroke-width: 2px; 
+    transition: all 0.3s; 
+    cursor: pointer;
+    pointer-events: none; /* Allows clicking pins behind it */
+}
 .node-point.active-highlight { 
     r: 12; 
     stroke-width: 5px; 
@@ -433,7 +440,7 @@ input:focus, select:focus { border-color: var(--primary); }
     font-size: 10px;
     font-weight: 600;
     fill: var(--text-dim);
-    pointer-events: none;
+    pointer-events: none; /* Already none, but reinforcing */
     font-family: 'JetBrains Mono', monospace;
     opacity: 0.8;
 }
