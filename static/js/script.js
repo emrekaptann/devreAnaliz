@@ -321,9 +321,10 @@ class SchematicRenderer {
     }
 
     stopDragging() {
+        const needsRender = this.draggingComp !== null || this.isSelecting;
         this.draggingComp = null;
         this.isSelecting = false;
-        this.render();
+        if (needsRender) this.render();
     }
 
     render() {
@@ -399,6 +400,7 @@ class SchematicRenderer {
             circle.setAttribute("r", nodeName ? "8" : "4"); // Increased r for visibility
             circle.setAttribute("class", "node-point");
             circle.setAttribute("data-node-id", nid);
+            circle.style.pointerEvents = "none"; // Don't block pin clicks for wiring
             if (nodeName) circle.setAttribute("data-node-group", nodeName);
             
             // Ground node special color
@@ -479,6 +481,29 @@ class SchematicRenderer {
                 pin.setAttribute("r", "8");
                 pin.style.fill = "var(--primary)";
             }
+            // Direct click handler for wiring - bypasses delegation issues
+            pin.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!this.isWiring) return;
+                if (!this.wireStartNode) {
+                    this.wireStartNode = nodeId;
+                    this.render();
+                } else if (this.wireStartNode !== nodeId) {
+                    const exists = this.wires.some(w => 
+                        (w.n1 === this.wireStartNode && w.n2 === nodeId) ||
+                        (w.n1 === nodeId && w.n2 === this.wireStartNode)
+                    );
+                    if (!exists) {
+                        this.wires.push({ n1: this.wireStartNode, n2: nodeId });
+                    }
+                    this.wireStartNode = null;
+                    this.lastNodeMap = null;
+                    this.render();
+                }
+            });
+            pin.addEventListener('mousedown', (e) => {
+                e.stopPropagation(); // Prevent selection/dragging when clicking pins
+            });
             this.svg.appendChild(pin);
         });
     }
