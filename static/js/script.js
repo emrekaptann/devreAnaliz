@@ -425,9 +425,14 @@ class SchematicRenderer {
         const midX = (p1.x + p2.x) / 2;
         const midY = (p1.y + p2.y) / 2;
 
+        const outerGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        outerGroup.setAttribute("transform", `translate(${midX}, ${midY}) rotate(${angle})`);
+        this.svg.appendChild(outerGroup);
+
         const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        group.setAttribute("transform", `translate(${midX}, ${midY}) rotate(${angle})`);
-        this.svg.appendChild(group);
+        group.setAttribute("class", "comp-group");
+        group.setAttribute("data-comp-id", c.id);
+        outerGroup.appendChild(group);
 
         group.addEventListener('mousedown', (e) => {
             e.stopPropagation();
@@ -451,6 +456,7 @@ class SchematicRenderer {
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("class", "comp-symbol");
+        path.setAttribute("data-comp-id", c.id);
         if (this.selectedIds.has(c.id)) {
             path.style.stroke = "var(--secondary)";
             path.style.strokeWidth = "3px";
@@ -463,6 +469,7 @@ class SchematicRenderer {
         else if (c.type === 'V' || c.type === 'I') {
             const circ = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circ.setAttribute("r", "12"); circ.setAttribute("class", "comp-symbol");
+            circ.setAttribute("data-comp-id", c.id);
             group.appendChild(circ);
             if (c.type === 'V') d = "M -8,0 L -2,0 M -5,-3 L -5,3 M 3,0 L 8,0";
             else d = "M -7,0 L 7,0 M 2,-3 L 7,0 L 2,3";
@@ -571,6 +578,17 @@ class SchematicRenderer {
             } else {
                 p.classList.remove('active-highlight');
                 p.setAttribute('r', '6');
+            }
+        });
+    }
+
+    highlightComponent(compId, active) {
+        const symbols = this.svg.querySelectorAll(`[data-comp-id="${compId}"]`);
+        symbols.forEach(s => {
+            if (active) {
+                s.classList.add('active-highlight');
+            } else {
+                s.classList.remove('active-highlight');
             }
         });
     }
@@ -807,7 +825,9 @@ function displayResults(data) {
         }
 
         html += `
-            <div class="comp-card ${status}">
+            <div class="comp-card ${status}" 
+                 onmouseenter="renderer.highlightComponent('${c.id}', true)" 
+                 onmouseleave="renderer.highlightComponent('${c.id}', false)">
                 <div class="comp-card-header">
                     <span class="comp-id">${c.name}</span>
                     <span class="status-badge ${status}">${statusText}</span>
