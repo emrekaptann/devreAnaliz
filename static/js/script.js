@@ -103,17 +103,21 @@ class SchematicRenderer {
             bridge: {
                 comps: [
                     { type: 'V', name: 'V', val: '10', dx: -120, dy: 0, rot: 90 },
-                    { type: 'R', name: 'R', val: '1k', dx: -40, dy: -40, rot: 0 },
-                    { type: 'R', name: 'R', val: '1k', dx: 40, dy: -40, rot: 0 },
-                    { type: 'R', name: 'R', val: '1k', dx: -40, dy: 40, rot: 0 },
-                    { type: 'R', name: 'R', val: '1k', dx: 40, dy: 40, rot: 0 },
-                    { type: 'R', name: 'R', val: '1k', dx: 0, dy: 0, rot: 90 }
+                    { type: 'R', name: 'R', val: '1k', dx: -28, dy: -28, rot: -45 },
+                    { type: 'R', name: 'R', val: '1k', dx: 28, dy: -28, rot: 45 },
+                    { type: 'R', name: 'R', val: '1k', dx: -28, dy: 28, rot: 45 },
+                    { type: 'R', name: 'R', val: '1k', dx: 28, dy: 28, rot: -45 },
+                    { type: 'R', name: 'R', val: '1k', dx: 0, dy: 0, rot: 0 }
                 ],
                 wires: [
-                    { n1: 0, p1: 1, n2: 1, p2: 1 }, { n1: 1, p1: 1, n2: 2, p2: 1 },
-                    { n1: 1, p1: 2, n2: 5, p2: 1 }, { n1: 2, p1: 2, n2: 5, p2: 2 },
-                    { n1: 5, p1: 1, n2: 3, p2: 1 }, { n1: 5, p1: 2, n2: 4, p2: 1 },
-                    { n1: 3, p1: 2, n2: 4, p2: 2 }, { n1: 4, p1: 2, n2: 0, p2: 2 }
+                    { n1: 1, p1: 2, n2: 2, p2: 1 },
+                    { n1: 3, p1: 2, n2: 4, p2: 1 },
+                    { n1: 1, p1: 1, n2: 3, p2: 1 },
+                    { n1: 2, p1: 2, n2: 4, p2: 2 },
+                    { n1: 5, p1: 1, n2: 1, p2: 1 },
+                    { n1: 5, p1: 2, n2: 2, p2: 2 },
+                    { n1: 0, p1: 1, n2: 1, p2: 2 },
+                    { n1: 0, p1: 2, n2: 3, p2: 2 }
                 ]
             }
         };
@@ -128,13 +132,15 @@ class SchematicRenderer {
             const n1 = `n_${id}_1`;
             const n2 = `n_${id}_2`;
             
-            if (c.rot === 90) {
-                this.nodes[n1] = { x: cx, y: cy - 40 };
-                this.nodes[n2] = { x: cx, y: cy + 40 };
-            } else {
-                this.nodes[n1] = { x: cx - 40, y: cy };
-                this.nodes[n2] = { x: cx + 40, y: cy };
-            }
+            const angleRad = (c.rot || 0) * Math.PI / 180;
+            this.nodes[n1] = { 
+                x: cx - Math.round(Math.cos(angleRad) * 40), 
+                y: cy - Math.round(Math.sin(angleRad) * 40) 
+            };
+            this.nodes[n2] = { 
+                x: cx + Math.round(Math.cos(angleRad) * 40), 
+                y: cy + Math.round(Math.sin(angleRad) * 40) 
+            };
 
             return { 
                 id, 
@@ -367,7 +373,7 @@ class SchematicRenderer {
                 line.setAttribute("x1", p1.x); line.setAttribute("y1", p1.y);
                 line.setAttribute("x2", p2.x); line.setAttribute("y2", p2.y);
                 line.setAttribute("stroke", this.selectedWireIndices.has(idx) ? "var(--secondary)" : "var(--primary)");
-                line.setAttribute("stroke-width", this.selectedWireIndices.has(idx) ? "4" : "2");
+                line.setAttribute("stroke-width", this.selectedWireIndices.has(idx) ? "4" : "2.5");
                 if (this.selectedWireIndices.has(idx)) {
                     line.style.filter = "drop-shadow(0 0 5px var(--secondary))";
                 }
@@ -471,16 +477,16 @@ class SchematicRenderer {
             path.style.filter = "drop-shadow(0 0 8px var(--secondary))";
         }
         let d = "";
-        if (c.type === 'R') d = "M -15,0 L -12,-5 L -6,5 L 0,-5 L 6,5 L 12,-5 L 15,0";
-        else if (c.type === 'C') d = "M -4,-10 L -4,10 M 4,-10 L 4,10 M -15,0 L -4,0 M 4,0 L 15,0";
-        else if (c.type === 'L') d = "M -15,0 Q -10,-10 -5,0 Q 0,-10 5,0 Q 10,-10 15,0";
+        if (c.type === 'R') d = "M -40,0 L -20,0 L -15,-8 L -5,8 L 5,-8 L 15,8 L 20,0 L 40,0";
+        else if (c.type === 'C') d = "M -40,0 L -6,0 M -6,-15 L -6,15 M 6,-15 L 6,15 M 6,0 L 40,0";
+        else if (c.type === 'L') d = "M -40,0 L -20,0 A 6.66 6.66 0 0 1 -6.66 0 A 6.66 6.66 0 0 1 6.66 0 A 6.66 6.66 0 0 1 20 0 L 40,0";
         else if (c.type === 'V' || c.type === 'I') {
             const circ = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            circ.setAttribute("r", "12"); circ.setAttribute("class", "comp-symbol");
+            circ.setAttribute("r", "16"); circ.setAttribute("class", "comp-symbol");
             circ.setAttribute("data-comp-id", c.id);
             group.appendChild(circ);
-            if (c.type === 'V') d = "M -8,0 L -2,0 M -5,-3 L -5,3 M 3,0 L 8,0";
-            else d = "M -7,0 L 7,0 M 2,-3 L 7,0 L 2,3";
+            if (c.type === 'V') d = "M -40,0 L -16,0 M 16,0 L 40,0 M -10,0 L -4,0 M -7,-3 L -7,3 M 4,0 L 10,0";
+            else d = "M -40,0 L -16,0 M 16,0 L 40,0 M -10,0 L 10,0 M 4,-5 L 10,0 L 4,5";
         }
         path.setAttribute("d", d);
         group.appendChild(path);
