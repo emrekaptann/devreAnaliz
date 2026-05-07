@@ -770,7 +770,11 @@ function updateSidebarComponentList(components) {
         'I': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="16" x2="12" y2="8"></line><polyline points="9 11 12 8 15 11"></polyline></svg>'
     };
     list.innerHTML = components.map(c => `
-        <div class="sidebar-comp-item">
+        <div class="sidebar-comp-item" 
+             style="cursor: pointer;"
+             onmouseenter="renderer.highlightComponent('${c.id}', true)"
+             onmouseleave="renderer.highlightComponent('${c.id}', false)"
+             onclick="const comp = renderer.components.find(x=>x.id==='${c.id}'); if(comp) openEditModal(comp);">
             <div class="sidebar-comp-icon">${typeIcons[c.type] || '⚙️'}</div>
             <div class="sidebar-comp-info">
                 <span class="sidebar-comp-name">${c.name}</span>
