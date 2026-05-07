@@ -268,7 +268,7 @@ class SchematicRenderer {
         const y = e.clientY - rect.top;
 
         // If clicking background or grid dot, start selection
-        if (e.target === this.svg || e.target.classList.contains('dot')) {
+        if (e.target === this.svg || e.target.classList.contains('dot') || e.target.classList.contains('grid-bg')) {
             this.isSelecting = true;
             this.selectionStart = { x, y };
             this.selectionEnd = { x, y };
@@ -361,16 +361,13 @@ class SchematicRenderer {
         this.svg.innerHTML = '';
         if (defs) this.svg.appendChild(defs);
 
-        // Draw background grid
-        for (let i = 0; i < this.svg.clientWidth; i += this.gridSize) {
-            for (let j = 0; j < this.svg.clientHeight; j += this.gridSize) {
-                const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                dot.setAttribute("cx", i); dot.setAttribute("cy", j);
-                dot.setAttribute("r", "0.5"); dot.setAttribute("fill", "var(--border)");
-                dot.setAttribute("class", "dot");
-                this.svg.appendChild(dot);
-            }
-        }
+        // Draw background grid using SVG Pattern
+        const gridRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        gridRect.setAttribute("width", "100%");
+        gridRect.setAttribute("height", "100%");
+        gridRect.setAttribute("fill", "url(#gridPattern)");
+        gridRect.setAttribute("class", "grid-bg");
+        this.svg.appendChild(gridRect);
 
         // Draw Selection Box
         if (this.isSelecting) {
