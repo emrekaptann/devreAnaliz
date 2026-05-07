@@ -762,7 +762,13 @@ function updateSidebarComponentList(components) {
         list.innerHTML = '<p class="empty-msg">Sürükleyip eleman ekleyin...</p>';
         return;
     }
-    const typeIcons = { 'R': '〰️', 'C': '⏸️', 'L': '➰', 'V': '⚡', 'I': '➡️' };
+    const typeIcons = { 
+        'R': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 6 12 8 6 12 18 16 6 18 12 22 12"></polyline></svg>',
+        'C': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="22" y2="12"></line><line x1="10" y1="6" x2="10" y2="18"></line><line x1="14" y1="6" x2="14" y2="18"></line></svg>',
+        'L': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3a3 3 0 0 1 6 0a3 3 0 0 1 6 0h3"></path></svg>',
+        'V': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="10" y1="10" x2="14" y2="10"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>',
+        'I': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="16" x2="12" y2="8"></line><polyline points="9 11 12 8 15 11"></polyline></svg>'
+    };
     list.innerHTML = components.map(c => `
         <div class="sidebar-comp-item">
             <div class="sidebar-comp-icon">${typeIcons[c.type] || '⚙️'}</div>
