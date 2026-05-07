@@ -336,6 +336,7 @@ input:focus, select:focus { border-color: var(--primary); }
 }
 
 .comp-card.delivering { border-left: 4px solid var(--secondary); }
+.comp-card.consuming { border-left: 4px solid var(--accent); }
 
 .comp-card:hover {
     transform: translateX(5px);
