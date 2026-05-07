@@ -266,16 +266,7 @@ input:focus, select:focus { border-color: var(--primary); }
     margin-bottom: 1rem;
 }
 .hint { font-size: 0.75rem; color: var(--text-dim); }
-#schematic-container { 
-    flex: 1; 
-    position: relative; 
-    overflow: auto; 
-}
-#schematic-svg {
-    min-width: 2500px;
-    min-height: 2500px;
-    background-color: transparent;
-}
+#schematic-container { flex: 1; position: relative; }
 
 .ac-settings {
     position: absolute;
