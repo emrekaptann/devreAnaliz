@@ -607,6 +607,7 @@ let compToEdit = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     renderer = new SchematicRenderer('schematic-svg');
+    window.renderer = renderer;
 
     // Toolbar Dragging
     const tools = document.querySelectorAll('.tool[draggable="true"]');
@@ -772,9 +773,9 @@ function updateSidebarComponentList(components) {
     list.innerHTML = components.map(c => `
         <div class="sidebar-comp-item" 
              style="cursor: pointer;"
-             onmouseenter="renderer.highlightComponent('${c.id}', true)"
-             onmouseleave="renderer.highlightComponent('${c.id}', false)"
-             onclick="const comp = renderer.components.find(x=>x.id==='${c.id}'); if(comp) openEditModal(comp);">
+             onmouseenter="window.renderer.highlightComponent(${c.id}, true)"
+             onmouseleave="window.renderer.highlightComponent(${c.id}, false)"
+             onclick="const comp = window.renderer.components.find(x=>x.id==${c.id}); if(comp) openEditModal(comp);">
             <div class="sidebar-comp-icon">${typeIcons[c.type] || '⚙️'}</div>
             <div class="sidebar-comp-info">
                 <span class="sidebar-comp-name">${c.name}</span>
@@ -849,8 +850,8 @@ function displayResults(data) {
 
         html += `
             <div class="comp-card ${status}" 
-                 onmouseenter="renderer.highlightComponent('${c.id}', true)" 
-                 onmouseleave="renderer.highlightComponent('${c.id}', false)">
+                 onmouseenter="window.renderer.highlightComponent(${c.id}, true)" 
+                 onmouseleave="window.renderer.highlightComponent(${c.id}, false)">
                 <div class="comp-card-header">
                     <span class="comp-id">${c.name}</span>
                     <span class="status-badge ${status}">${statusText}</span>
@@ -892,8 +893,8 @@ function displayResults(data) {
         
         nodesHtml += `
             <div class="${cardClass}" 
-                 onmouseenter="renderer.highlightNodeGroup('${node}', true)" 
-                 onmouseleave="renderer.highlightNodeGroup('${node}', false)">
+                 onmouseenter="window.renderer.highlightNodeGroup('${node}', true)" 
+                 onmouseleave="window.renderer.highlightNodeGroup('${node}', false)">
                 <div class="node-info-main">
                     <h4>${displayName}</h4>
                     <span class="node-usage">${isGnd ? "0V Referans Noktası" : "Ölçülen Potansiyel"}</span>
