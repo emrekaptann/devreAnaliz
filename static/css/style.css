@@ -282,7 +282,34 @@ input:focus, select:focus { border-color: var(--primary); }
     background: var(--bg-sidebar);
 }
 
-/* Results Components */
+/* Results Components & Animations */
+@keyframes slideInUpSmooth {
+    0% {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#results-content > * {
+    opacity: 0;
+    animation: slideInUpSmooth 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+#results-content > *:nth-child(1) { animation-delay: 0.05s; }
+#results-content > *:nth-child(2) { animation-delay: 0.10s; }
+#results-content > *:nth-child(3) { animation-delay: 0.15s; }
+#results-content > *:nth-child(4) { animation-delay: 0.20s; }
+#results-content > *:nth-child(5) { animation-delay: 0.25s; }
+#results-content > *:nth-child(6) { animation-delay: 0.30s; }
+#results-content > *:nth-child(7) { animation-delay: 0.35s; }
+#results-content > *:nth-child(8) { animation-delay: 0.40s; }
+#results-content > *:nth-child(9) { animation-delay: 0.45s; }
+#results-content > *:nth-child(n+10) { animation-delay: 0.50s; }
+
 .result-section-title {
     font-size: 0.9rem;
     font-weight: 600;
