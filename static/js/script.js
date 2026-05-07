@@ -434,14 +434,22 @@ class SchematicRenderer {
         group.setAttribute("data-comp-id", c.id);
         outerGroup.appendChild(group);
 
+        let mousedownPos = { x: 0, y: 0 };
         group.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            mousedownPos = { x: e.clientX, y: e.clientY };
             this.startDragging(c, e);
         });
 
-        group.addEventListener('click', (e) => {
+        group.addEventListener('mouseup', (e) => {
             e.stopPropagation();
-            if (!this.draggingComp) openEditModal(c);
+            const dx = Math.abs(e.clientX - mousedownPos.x);
+            const dy = Math.abs(e.clientY - mousedownPos.y);
+            // Sadece tıklandıysa (sürüklenme yoksa) modalı aç
+            if (dx < 3 && dy < 3) {
+                openEditModal(c);
+            }
+            this.stopDragging();
         });
 
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
