@@ -100,6 +100,29 @@ class SchematicRenderer {
                     { n1: 0, p1: 2, n2: 1, p2: 2 }, { n1: 1, p1: 2, n2: 2, p2: 2 }
                 ]
             },
+            v_divider: {
+                comps: [
+                    { type: 'V', name: 'V', val: '12', dx: -60, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R1', val: '1k', dx: 60, dy: -60, rot: 90 },
+                    { type: 'R', name: 'R2', val: '2k', dx: 60, dy: 60, rot: 90 }
+                ],
+                wires: [
+                    { n1: 0, p1: 1, n2: 1, p2: 1 },
+                    { n1: 0, p1: 2, n2: 2, p2: 2 },
+                    { n1: 1, p1: 2, n2: 2, p2: 1 }
+                ]
+            },
+            i_divider: {
+                comps: [
+                    { type: 'I', name: 'I', val: '2', dx: -80, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R1', val: '1k', dx: 0, dy: 0, rot: 90 },
+                    { type: 'R', name: 'R2', val: '1k', dx: 80, dy: 0, rot: 90 }
+                ],
+                wires: [
+                    { n1: 0, p1: 1, n2: 1, p2: 1 }, { n1: 1, p1: 1, n2: 2, p2: 1 },
+                    { n1: 0, p1: 2, n2: 1, p2: 2 }, { n1: 1, p1: 2, n2: 2, p2: 2 }
+                ]
+            },
             bridge: {
                 comps: [
                     { type: 'V', name: 'V', val: '10', dx: -120, dy: 0, rot: 90 },
