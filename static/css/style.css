@@ -580,3 +580,50 @@ input:focus, select:focus { border-color: var(--primary); }
     70% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
     100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
 }
+
+/* Sidebar Component List Items */
+.sidebar-comp-item {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s;
+}
+
+.sidebar-comp-item:hover {
+    border-color: var(--primary);
+    transform: translateX(5px);
+    background: var(--border);
+}
+
+.sidebar-comp-icon {
+    font-size: 1.2rem;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--border);
+    border-radius: 8px;
+}
+
+.sidebar-comp-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-comp-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.sidebar-comp-val {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+}

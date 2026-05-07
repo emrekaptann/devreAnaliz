@@ -762,9 +762,14 @@ function updateSidebarComponentList(components) {
         list.innerHTML = '<p class="empty-msg">Sürükleyip eleman ekleyin...</p>';
         return;
     }
+    const typeIcons = { 'R': '〰️', 'C': '⏸️', 'L': '➰', 'V': '⚡', 'I': '➡️' };
     list.innerHTML = components.map(c => `
-        <div class="comp-item">
-            <b>${c.name}</b>: ${c.value}
+        <div class="sidebar-comp-item">
+            <div class="sidebar-comp-icon">${typeIcons[c.type] || '⚙️'}</div>
+            <div class="sidebar-comp-info">
+                <span class="sidebar-comp-name">${c.name}</span>
+                <span class="sidebar-comp-val">${c.value}</span>
+            </div>
         </div>
     `).join('');
 }
