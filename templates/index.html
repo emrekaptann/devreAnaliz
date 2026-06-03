@@ -1,19 +1,27 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Devre Analiz - Pro Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js for oscilloscope graphing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div class="dashboard">
         <header class="top-bar">
             <div class="logo">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
                 <h1>Devre<span>Analiz</span></h1>
             </div>
             <div class="user-info">2003240044 ABDURRAHİM EMRE KAPTAN</div>
@@ -21,9 +29,13 @@
                 <div class="mode-selector">
                     <button id="dc-mode" class="active">DC Analizi</button>
                     <button id="ac-mode">AC Analizi</button>
+                    <button id="transient-mode">Osiloskop Modu</button>
                 </div>
                 <button id="theme-toggle" class="theme-toggle" title="Temayı Değiştir">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
                 </button>
                 <button id="solve-btn" class="solve-btn pulse">Hesapla</button>
             </div>
@@ -36,27 +48,80 @@
                     <h2>Araç Gereçler</h2>
                     <div class="toolbar" id="component-toolbar">
                         <div class="tool" draggable="true" data-type="R" title="Direnç">
-                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 6 12 8 6 12 18 16 6 18 12 22 12"></polyline></svg></span>
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="2 12 6 12 8 6 12 18 16 6 18 12 22 12"></polyline>
+                                </svg></span>
                             <span>Direnç</span>
                         </div>
                         <div class="tool" draggable="true" data-type="C" title="Kondansatör">
-                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="22" y2="12"></line><line x1="10" y1="6" x2="10" y2="18"></line><line x1="14" y1="6" x2="14" y2="18"></line></svg></span>
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <line x1="2" y1="12" x2="10" y2="12"></line>
+                                    <line x1="14" y1="12" x2="22" y2="12"></line>
+                                    <line x1="10" y1="6" x2="10" y2="18"></line>
+                                    <line x1="14" y1="6" x2="14" y2="18"></line>
+                                </svg></span>
                             <span>Kondansatör</span>
                         </div>
                         <div class="tool" draggable="true" data-type="L" title="Bobin">
-                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3a3 3 0 0 1 6 0a3 3 0 0 1 6 0h3"></path></svg></span>
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M2 12h3a3 3 0 0 1 6 0a3 3 0 0 1 6 0h3"></path>
+                                </svg></span>
                             <span>Bobin</span>
                         </div>
                         <div class="tool" draggable="true" data-type="V" title="Gerilim Kaynağı">
-                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="10" y1="10" x2="14" y2="10"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg></span>
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="8"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="10" y1="10" x2="14" y2="10"></line>
+                                    <line x1="10" y1="16" x2="14" y2="16"></line>
+                                </svg></span>
                             <span>Gerilim</span>
                         </div>
                         <div class="tool" draggable="true" data-type="I" title="Akım Kaynağı">
-                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="16" x2="12" y2="8"></line><polyline points="9 11 12 8 15 11"></polyline></svg></span>
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="8"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="8"></line>
+                                    <polyline points="9 11 12 8 15 11"></polyline>
+                                </svg></span>
                             <span>Akım</span>
                         </div>
+                        <div class="tool" draggable="true" data-type="D" title="Diyot">
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polygon points="6 4 18 12 6 20 6 4" fill="none"></polygon>
+                                    <line x1="18" y1="4" x2="18" y2="20"></line>
+                                </svg></span>
+                            <span>Diyot</span>
+                        </div>
+                        <div class="tool" draggable="true" data-type="OP" title="Op-Amp">
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polygon points="4 3 20 12 4 21 4 3" fill="none"></polygon>
+                                    <line x1="4" y1="8" x2="10" y2="8"></line>
+                                    <line x1="4" y1="16" x2="10" y2="16"></line>
+                                </svg></span>
+                            <span>Op-Amp</span>
+                        </div>
                         <div class="tool" id="wire-tool" title="Bağlantı Kablosu">
-                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12"></path><circle cx="4" cy="12" r="2"></circle><circle cx="20" cy="12" r="2"></circle></svg></span>
+                            <span class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M6 12h12"></path>
+                                    <circle cx="4" cy="12" r="2"></circle>
+                                    <circle cx="20" cy="12" r="2"></circle>
+                                </svg></span>
                             <span>Kablo (Jumper)</span>
                         </div>
                     </div>
@@ -67,23 +132,64 @@
                     <h2>Hazır Şablonlar</h2>
                     <div class="template-list">
                         <div class="template-item" draggable="true" data-template="series" title="Seri Devre">
-                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="10" width="6" height="4"></rect><rect x="14" y="10" width="6" height="4"></rect><line x1="8" y1="12" x2="14" y2="12"></line></svg></span>
+                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <rect x="2" y="10" width="6" height="4"></rect>
+                                    <rect x="14" y="10" width="6" height="4"></rect>
+                                    <line x1="8" y1="12" x2="14" y2="12"></line>
+                                </svg></span>
                             <span>Seri Devre</span>
                         </div>
                         <div class="template-item" draggable="true" data-template="parallel" title="Paralel Devre">
-                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="4" width="8" height="4"></rect><rect x="8" y="16" width="8" height="4"></rect><line x1="4" y1="6" x2="8" y2="6"></line><line x1="4" y1="18" x2="8" y2="18"></line><line x1="4" y1="6" x2="4" y2="18"></line></svg></span>
+                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <rect x="8" y="4" width="8" height="4"></rect>
+                                    <rect x="8" y="16" width="8" height="4"></rect>
+                                    <line x1="4" y1="6" x2="8" y2="6"></line>
+                                    <line x1="4" y1="18" x2="8" y2="18"></line>
+                                    <line x1="4" y1="6" x2="4" y2="18"></line>
+                                </svg></span>
                             <span>Paralel Devre</span>
                         </div>
                         <div class="template-item" draggable="true" data-template="v_divider" title="Gerilim Bölücü">
-                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="2" width="4" height="6"></rect><rect x="10" y="16" width="4" height="6"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="4" y1="2" x2="10" y2="2"></line><line x1="4" y1="22" x2="10" y2="22"></line><line x1="4" y1="2" x2="4" y2="22"></line></svg></span>
+                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <rect x="10" y="2" width="4" height="6"></rect>
+                                    <rect x="10" y="16" width="4" height="6"></rect>
+                                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                                    <line x1="4" y1="2" x2="10" y2="2"></line>
+                                    <line x1="4" y1="22" x2="10" y2="22"></line>
+                                    <line x1="4" y1="2" x2="4" y2="22"></line>
+                                </svg></span>
                             <span>Gerilim Bölücü</span>
                         </div>
                         <div class="template-item" draggable="true" data-template="i_divider" title="Akım Bölücü">
-                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="4" height="12"></rect><rect x="18" y="6" width="4" height="12"></rect><line x1="4" y1="4" x2="20" y2="4"></line><line x1="4" y1="20" x2="20" y2="20"></line><line x1="4" y1="4" x2="4" y2="20"></line><line x1="12" y1="4" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="20"></line><line x1="20" y1="4" x2="20" y2="6"></line><line x1="20" y1="18" x2="20" y2="20"></line></svg></span>
+                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <rect x="10" y="6" width="4" height="12"></rect>
+                                    <rect x="18" y="6" width="4" height="12"></rect>
+                                    <line x1="4" y1="4" x2="20" y2="4"></line>
+                                    <line x1="4" y1="20" x2="20" y2="20"></line>
+                                    <line x1="4" y1="4" x2="4" y2="20"></line>
+                                    <line x1="12" y1="4" x2="12" y2="6"></line>
+                                    <line x1="12" y1="18" x2="12" y2="20"></line>
+                                    <line x1="20" y1="4" x2="20" y2="6"></line>
+                                    <line x1="20" y1="18" x2="20" y2="20"></line>
+                                </svg></span>
                             <span>Akım Bölücü</span>
                         </div>
                         <div class="template-item" draggable="true" data-template="bridge" title="Köprü Devresi">
-                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 12 12 22 2 12"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span>
+                            <span class="template-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polygon points="12 2 22 12 12 22 2 12"></polygon>
+                                    <line x1="12" y1="2" x2="12" y2="22"></line>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                </svg></span>
                             <span>Köprü Devresi</span>
                         </div>
                     </div>
@@ -97,6 +203,12 @@
                         <p class="empty-msg">Devrenizi oluşturun...</p>
                     </div>
                     <button id="clear-btn" class="clear-btn">Tümünü Temizle</button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                        <button id="save-json-btn" class="clear-btn" style="margin-top: 0;" title="Devreyi JSON olarak kaydet">JSON Kaydet</button>
+                        <button id="load-json-btn" class="clear-btn" style="margin-top: 0;" title="JSON devresi yükle">JSON Yükle</button>
+                    </div>
+                    <button id="export-png-btn" class="clear-btn" style="margin-top: 8px;" title="Şemayı resim olarak indir">Şemayı PNG Yap</button>
+                    <input type="file" id="json-file-input" accept=".json" class="hidden">
                 </section>
             </aside>
 
@@ -104,7 +216,6 @@
             <main class="main-canvas glass">
                 <div class="canvas-header">
                     <h2>Devre Şeması</h2>
-                    <span class="hint">Elemanları otomatik olarak yerleştirir</span>
                 </div>
                 <div id="schematic-container">
                     <svg id="schematic-svg" width="100%" height="100%">
@@ -118,9 +229,18 @@
                         </defs>
                     </svg>
                 </div>
+                <div id="chart-container" class="glass hidden" style="height: 250px; margin-top: 15px; padding: 15px; border-radius: 12px; position: relative; border: 1px solid var(--border); background: var(--bg-sidebar);">
+                    <canvas id="osc-chart" style="width:100%; height:100%;"></canvas>
+                </div>
                 <div id="freq-config" class="ac-settings glass hidden">
                     <label>AC Frekans (Hz):</label>
-                    <input type="number" id="circuit-freq" value="1000">
+                    <input type="number" id="circuit-freq" value="1000" style="width: 80px;">
+                </div>
+                <div id="transient-config" class="ac-settings glass hidden">
+                    <label>Durdurma Süresi (sn):</label>
+                    <input type="number" id="transient-stop" value="0.01" step="any" style="width: 70px;">
+                    <label>Zaman Adımı (sn):</label>
+                    <input type="number" id="transient-step" value="0.0001" step="any" style="width: 80px;">
                 </div>
             </main>
 
@@ -130,7 +250,13 @@
                     <h2>Analiz Sonuçları</h2>
                     <div id="results-content">
                         <div class="placeholder-results">
-                            <div class="pulse-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
+                            <div class="pulse-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                                </svg></div>
                             <p>Sonuçlar burada görünecek.</p>
                         </div>
                     </div>
@@ -147,22 +273,22 @@
                 <label>İsim</label>
                 <input type="text" id="edit-name">
             </div>
-                <div class="form-group">
-                    <label>Değer</label>
-                    <div class="input-row">
-                        <input type="number" id="edit-value-num" step="any" placeholder="1.0">
-                        <select id="edit-value-unit">
-                            <option value="">-</option>
-                            <option value="p">p (piko)</option>
-                            <option value="n">n (nano)</option>
-                            <option value="u">u (mikro)</option>
-                            <option value="m">m (mili)</option>
-                            <option value="k">k (kilo)</option>
-                            <option value="M">M (mega)</option>
-                        </select>
-                        <span id="unit-label" class="unit-suffix">Ω</span>
-                    </div>
+            <div class="form-group">
+                <label>Değer</label>
+                <div class="input-row">
+                    <input type="number" id="edit-value-num" step="any" placeholder="1.0">
+                    <select id="edit-value-unit">
+                        <option value="">-</option>
+                        <option value="p">p (piko)</option>
+                        <option value="n">n (nano)</option>
+                        <option value="u">u (mikro)</option>
+                        <option value="m">m (mili)</option>
+                        <option value="k">k (kilo)</option>
+                        <option value="M">M (mega)</option>
+                    </select>
+                    <span id="unit-label" class="unit-suffix">Ω</span>
                 </div>
+            </div>
             <div id="edit-phase-group" class="input-group hidden">
                 <label>Faz (°)</label>
                 <input type="number" id="edit-phase">
@@ -177,4 +303,5 @@
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
+
 </html>

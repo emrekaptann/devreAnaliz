@@ -54,23 +54,45 @@ class SchematicRenderer {
         if (!type) return;
 
         const compId = Date.now();
-        const n1 = `n_${compId}_1`;
-        const n2 = `n_${compId}_2`;
+        let n1, n2, n3 = null;
 
-        this.nodes[n1] = { x: x - 40, y: y };
-        this.nodes[n2] = { x: x + 40, y: y };
+        if (type === 'OP') {
+            n1 = `n_${compId}_1`; // In+
+            n2 = `n_${compId}_2`; // In-
+            n3 = `n_${compId}_3`; // Out
+            this.nodes[n1] = { x: x - 40, y: y - 20 };
+            this.nodes[n2] = { x: x - 40, y: y + 20 };
+            this.nodes[n3] = { x: x + 40, y: y };
+        } else {
+            n1 = `n_${compId}_1`;
+            n2 = `n_${compId}_2`;
+            this.nodes[n1] = { x: x - 40, y: y };
+            this.nodes[n2] = { x: x + 40, y: y };
+        }
+
+        // Set default value based on component type
+        let defaultValue = '1k';
+        if (type === 'V') defaultValue = '10';
+        else if (type === 'I') defaultValue = '1';
+        else if (type === 'C') defaultValue = '1u';
+        else if (type === 'L') defaultValue = '10m';
+        else if (type === 'D') defaultValue = ''; // Diode does not need value
+        else if (type === 'OP') defaultValue = '1e5'; // Op-Amp gain
 
         const newComp = {
             id: compId,
             type: type,
             name: `${type}${this.components.length + 1}`,
-            value: type === 'V' ? '10' : (type === 'R' ? '1k' : '1u'),
+            value: defaultValue,
             n1: n1,
             n2: n2,
             phase: 0,
             x: x,
             y: y
         };
+        if (n3) {
+            newComp.n3 = n3;
+        }
 
         this.components.push(newComp);
         this.render();
@@ -204,6 +226,7 @@ class SchematicRenderer {
                     c.y += dy;
                     affectedNodes.add(c.n1);
                     affectedNodes.add(c.n2);
+                    if (c.n3) affectedNodes.add(c.n3);
                 });
 
                 affectedNodes.forEach(nid => {
@@ -303,32 +326,52 @@ class SchematicRenderer {
         });
     }
 
+    deleteComponents(compIds) {
+        if (!compIds || compIds.size === 0) return;
+        
+        const deletedCompNodeIds = new Set();
+        this.components.forEach(c => {
+            if (compIds.has(c.id)) {
+                deletedCompNodeIds.add(c.n1);
+                deletedCompNodeIds.add(c.n2);
+                if (c.n3) deletedCompNodeIds.add(c.n3);
+            }
+        });
+
+        this.components = this.components.filter(c => !compIds.has(c.id));
+
+        deletedCompNodeIds.forEach(nid => {
+            delete this.nodes[nid];
+        });
+
+        this.wires = this.wires.filter(w => !deletedCompNodeIds.has(w.n1) && !deletedCompNodeIds.has(w.n2));
+        
+        this.selectedIds.clear();
+        this.selectedWireIndices.clear();
+        this.lastNodeMap = null;
+        this.render();
+        clearResults();
+    }
+
     handleKeyDown(e) {
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (this.selectedIds.size > 0 || this.selectedWireIndices.size > 0) {
-                // Delete selected components and their wires
-                const deletedCompNodeIds = new Set();
-                this.components.forEach(c => {
-                    if (this.selectedIds.has(c.id)) {
-                        deletedCompNodeIds.add(c.n1);
-                        deletedCompNodeIds.add(c.n2);
-                    }
-                });
+            let changed = false;
+            
+            if (this.selectedIds.size > 0) {
+                this.deleteComponents(this.selectedIds);
+                changed = true;
+            }
 
-                this.components = this.components.filter(c => !this.selectedIds.has(c.id));
-                
-                // Delete selected wires OR wires connected to deleted components
-                this.wires = this.wires.filter((w, idx) => {
-                    if (this.selectedWireIndices.has(idx)) return false;
-                    if (deletedCompNodeIds.has(w.n1) || deletedCompNodeIds.has(w.n2)) return false;
-                    return true;
-                });
-
-                this.selectedIds.clear();
+            if (this.selectedWireIndices.size > 0) {
+                this.wires = this.wires.filter((w, idx) => !this.selectedWireIndices.has(idx));
                 this.selectedWireIndices.clear();
-                this.lastNodeMap = null; // Clear labels
+                changed = true;
+            }
+
+            if (changed) {
+                this.lastNodeMap = null;
                 this.render();
-                clearResults(); // Reset results panel
+                clearResults();
             }
         }
     }
@@ -356,7 +399,89 @@ class SchematicRenderer {
         if (needsRender) this.render();
     }
 
+    runDRC() {
+        const warnings = [];
+        const floatingNodeIds = new Set();
+        const burnedResistorIds = new Set();
+        
+        // 1. Check for unconnected / floating node pins
+        const nodeConnectionCounts = {};
+        for (const nid in this.nodes) {
+            nodeConnectionCounts[nid] = 0;
+        }
+        this.components.forEach(c => {
+            if (nodeConnectionCounts[c.n1] !== undefined) nodeConnectionCounts[c.n1]++;
+            if (nodeConnectionCounts[c.n2] !== undefined) nodeConnectionCounts[c.n2]++;
+            if (c.n3 && nodeConnectionCounts[c.n3] !== undefined) nodeConnectionCounts[c.n3]++;
+        });
+        this.wires.forEach(w => {
+            if (nodeConnectionCounts[w.n1] !== undefined) nodeConnectionCounts[w.n1]++;
+            if (nodeConnectionCounts[w.n2] !== undefined) nodeConnectionCounts[w.n2]++;
+        });
+        for (const nid in nodeConnectionCounts) {
+            if (nodeConnectionCounts[nid] <= 1) {
+                floatingNodeIds.add(nid);
+            }
+        }
+        if (floatingNodeIds.size > 0) {
+            warnings.push({
+                type: 'floating_node',
+                message: `Uyarı: Boşta Duran Bağlantı! Bazı pinler devreye bağlanmamıştır (sarı noktalar).`
+            });
+        }
+
+        // 2. Check for short circuited voltage sources
+        if (this.lastNodeMap) {
+            this.components.forEach(c => {
+                if (c.type === 'V') {
+                    const n1Mapped = this.lastNodeMap[c.n1];
+                    const n2Mapped = this.lastNodeMap[c.n2];
+                    if (n1Mapped && n2Mapped && n1Mapped === n2Mapped) {
+                        warnings.push({
+                            type: 'short_circuit',
+                            message: `Kritik Hata: Gerilim kaynağı ${c.name} kısa devre edilmiş!`,
+                            compId: c.id
+                        });
+                    }
+                }
+            });
+        }
+
+        // 3. Check for burned resistors (> 0.25W)
+        if (this.lastSolveResults && this.lastSolveResults.voltages && this.lastNodeMap) {
+            const voltages = this.lastSolveResults.voltages;
+            this.components.forEach(c => {
+                if (c.type === 'R') {
+                    const n1Mapped = this.lastNodeMap[c.n1];
+                    const n2Mapped = this.lastNodeMap[c.n2];
+                    const v1Info = voltages[n1Mapped];
+                    const v2Info = voltages[n2Mapped];
+                    const v1 = v1Info ? (v1Info.mag !== undefined ? v1Info.mag : Math.abs(v1Info.real || v1Info || 0)) : 0;
+                    const v2 = v2Info ? (v2Info.mag !== undefined ? v2Info.mag : Math.abs(v2Info.real || v2Info || 0)) : 0;
+                    const vDrop = v1 - v2;
+                    const r = parseValue(c.value);
+                    const p = (vDrop * vDrop) / r;
+                    if (p > 0.25) {
+                        burnedResistorIds.add(c.id);
+                        warnings.push({
+                            type: 'overload',
+                            message: `Direnç Aşırı Güç: ${c.name} direnci 0.25W sınırını aştı (${p.toFixed(3)}W)! Yanma riski!`,
+                            compId: c.id
+                        });
+                    }
+                }
+            });
+        }
+
+        return { warnings, floatingNodeIds, burnedResistorIds };
+    }
+
     render() {
+        const drc = this.runDRC();
+        this.floatingNodeIds = drc.floatingNodeIds;
+        this.burnedResistorIds = drc.burnedResistorIds;
+        this.drcWarnings = drc.warnings;
+
         const defs = this.svg.querySelector('defs');
         this.svg.innerHTML = '';
         if (defs) this.svg.appendChild(defs);
@@ -398,6 +523,28 @@ class SchematicRenderer {
                     line.style.filter = "drop-shadow(0 0 5px var(--secondary))";
                 }
                 this.svg.appendChild(line);
+
+                // Add current flow animation overlay
+                if (this.lastSolveResults && this.lastSolveResults.voltages && this.lastNodeMap) {
+                    const nodeName1 = this.lastNodeMap[w.n1];
+                    const nodeName2 = this.lastNodeMap[w.n2];
+                    const v1Info = nodeName1 ? this.lastSolveResults.voltages[nodeName1] : null;
+                    const v2Info = nodeName2 ? this.lastSolveResults.voltages[nodeName2] : null;
+                    
+                    const v1 = v1Info ? (v1Info.mag !== undefined ? v1Info.mag : Math.abs(v1Info.real || v1Info)) : 0;
+                    const v2 = v2Info ? (v2Info.mag !== undefined ? v2Info.mag : Math.abs(v2Info.real || v2Info)) : 0;
+                    
+                    // Only animate if there is potential (voltage) in the node group
+                    if (v1 > 0.01 || v2 > 0.01) {
+                        const flowLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        flowLine.setAttribute("x1", p1.x); flowLine.setAttribute("y1", p1.y);
+                        flowLine.setAttribute("x2", p2.x); flowLine.setAttribute("y2", p2.y);
+                        flowLine.setAttribute("stroke", "var(--secondary)");
+                        flowLine.setAttribute("stroke-width", "2");
+                        flowLine.setAttribute("class", "wire-flow-animation");
+                        this.svg.appendChild(flowLine);
+                    }
+                }
             }
         });
 
@@ -412,7 +559,11 @@ class SchematicRenderer {
 
         // Draw node points and labels (Drawn last to be on top)
         const usedNodeIds = new Set();
-        this.components.forEach(c => { usedNodeIds.add(c.n1); usedNodeIds.add(c.n2); });
+        this.components.forEach(c => {
+            usedNodeIds.add(c.n1);
+            usedNodeIds.add(c.n2);
+            if (c.n3) usedNodeIds.add(c.n3);
+        });
         this.wires.forEach(w => { usedNodeIds.add(w.n1); usedNodeIds.add(w.n2); });
 
         const activeNodes = this.lastNodeMap ? Object.keys(this.lastNodeMap) : Array.from(usedNodeIds);
@@ -432,6 +583,13 @@ class SchematicRenderer {
             // Ground node special color
             if (nodeName === '0') circle.style.stroke = "var(--secondary)";
 
+            // Highlight floating nodes in yellow/orange
+            if (this.floatingNodeIds && this.floatingNodeIds.has(nid)) {
+                circle.style.stroke = "#eab308";
+                circle.style.strokeWidth = "2.5px";
+                circle.setAttribute("r", "7");
+            }
+
             this.svg.appendChild(circle);
 
             if (nodeName) {
@@ -447,9 +605,15 @@ class SchematicRenderer {
     }
 
     drawComponent(c, p1, p2) {
-        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
+        let angle = 0;
+        let midX = c.x;
+        let midY = c.y;
+        
+        if (c.type !== 'OP') {
+            angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+            midX = (p1.x + p2.x) / 2;
+            midY = (p1.y + p2.y) / 2;
+        }
 
         const outerGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
         outerGroup.setAttribute("transform", `translate(${midX}, ${midY}) rotate(${angle})`);
@@ -479,9 +643,10 @@ class SchematicRenderer {
         });
 
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        text.textContent = `${c.name} (${c.value})`;
+        let valDisplay = c.value ? ` (${c.value})` : "";
+        text.textContent = `${c.name}${valDisplay}`;
         text.setAttribute("text-anchor", "middle");
-        text.setAttribute("y", -25);
+        text.setAttribute("y", c.type === 'OP' ? -40 : -25);
         text.setAttribute("class", "comp-text");
         let labelRotate = 0;
         if (Math.abs(angle) > 90) labelRotate = 180;
@@ -496,6 +661,9 @@ class SchematicRenderer {
             path.style.strokeWidth = "3px";
             path.style.filter = "drop-shadow(0 0 8px var(--secondary))";
         }
+        if (this.burnedResistorIds && this.burnedResistorIds.has(c.id)) {
+            path.classList.add('burned-resistor');
+        }
         let d = "";
         if (c.type === 'R') d = "M -40,0 L -20,0 L -15,-8 L -5,8 L 5,-8 L 15,8 L 20,0 L 40,0";
         else if (c.type === 'C') d = "M -40,0 L -6,0 M -6,-15 L -6,15 M 6,-15 L 6,15 M 6,0 L 40,0";
@@ -508,12 +676,24 @@ class SchematicRenderer {
             if (c.type === 'V') d = "M -40,0 L -16,0 M 16,0 L 40,0 M -10,0 L -4,0 M -7,-3 L -7,3 M 4,0 L 10,0";
             else d = "M -40,0 L -16,0 M 16,0 L 40,0 M -10,0 L 10,0 M 4,-5 L 10,0 L 4,5";
         }
+        else if (c.type === 'D') {
+            d = "M -40,0 L -10,0 M -10,-12 L 10,0 L -10,12 Z M 10,-12 L 10,12 M 10,0 L 40,0";
+        }
+        else if (c.type === 'OP') {
+            d = "M -20,-30 L 20,0 L -20,30 Z M -40,-20 L -20,-20 M -40,20 L -20,20 M 20,0 L 40,0 M -15,-12 L -9,-12 M -12,-15 L -12,-9 M -15,12 L -9,12";
+        }
         path.setAttribute("d", d);
         group.appendChild(path);
 
         // Terminals
-        [p1, p2].forEach((p, i) => {
-            const nodeId = i === 0 ? c.n1 : c.n2;
+        const pins = [];
+        pins.push({ p: p1, nodeId: c.n1 });
+        pins.push({ p: p2, nodeId: c.n2 });
+        if (c.n3 && this.nodes[c.n3]) {
+            pins.push({ p: this.nodes[c.n3], nodeId: c.n3 });
+        }
+
+        pins.forEach(({ p, nodeId }) => {
             const pin = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             pin.setAttribute("cx", p.x); pin.setAttribute("cy", p.y);
             pin.setAttribute("r", "5"); pin.setAttribute("class", "pin");
@@ -558,6 +738,7 @@ class SchematicRenderer {
         this.components.forEach(c => {
             usedNodeIds.add(c.n1);
             usedNodeIds.add(c.n2);
+            if (c.n3) usedNodeIds.add(c.n3);
         });
         this.wires.forEach(w => {
             usedNodeIds.add(w.n1);
@@ -596,11 +777,17 @@ class SchematicRenderer {
         });
 
         this.lastNodeMap = nodeMap; // Save for rendering labels
-        return this.components.map(c => ({
-            ...c,
-            n1: nodeMap[c.n1],
-            n2: nodeMap[c.n2]
-        }));
+        return this.components.map(c => {
+            const mapped = {
+                ...c,
+                n1: nodeMap[c.n1],
+                n2: nodeMap[c.n2]
+            };
+            if (c.n3) {
+                mapped.n3 = nodeMap[c.n3];
+            }
+            return mapped;
+        });
     }
 
     highlightNodeGroup(groupName, active) {
@@ -678,9 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     deleteBtn.addEventListener('click', () => {
         if (compToEdit) {
-            renderer.components = renderer.components.filter(c => c.id !== compToEdit.id);
-            // Also cleanup standalone nodes/wires? Keeping it simple for now.
-            renderer.render();
+            renderer.deleteComponents(new Set([compToEdit.id]));
             modal.classList.add('hidden');
         }
     });
@@ -692,9 +877,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const mnaComps = renderer.getMNAComponents();
         if (mnaComps.length === 0) return;
 
+        let mode = 'steady';
+        if (document.getElementById('transient-mode').classList.contains('active')) {
+            mode = 'transient';
+        }
+
         const payload = {
-            frequency: document.getElementById('ac-mode').classList.contains('active') ? 
-                      parseFloat(document.getElementById('circuit-freq').value) : 0,
+            mode: mode,
+            frequency: (mode === 'transient' || document.getElementById('ac-mode').classList.contains('active')) ? 
+                      parseFloat(document.getElementById('circuit-freq').value || 1000) : 0,
+            t_stop: parseFloat(document.getElementById('transient-stop').value || 0.01),
+            t_step: parseFloat(document.getElementById('transient-step').value || 0.0001),
             components: mnaComps
         };
 
@@ -715,8 +908,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("DEBUG: Server returned error:", data.error);
                 alert("Analiz Hatası: " + data.error);
             } else {
+                renderer.lastSolveResults = data;
                 displayResults(data);
-                renderer.render(); // Ensure labels appear immediately
+                renderer.render(); // Ensure labels and flow overlay appear immediately
             }
         } catch (e) {
             console.error("DEBUG: Fetch error:", e);
@@ -733,8 +927,166 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.nodes = {};
         renderer.wires = [];
         renderer.lastNodeMap = null;
+        renderer.lastSolveResults = null;
+        if (window.chartInstance) {
+            window.chartInstance.destroy();
+            window.chartInstance = null;
+        }
         renderer.render();
         clearResults();
+    });
+
+    // Mode Toggles
+    const dcMode = document.getElementById('dc-mode');
+    const acMode = document.getElementById('ac-mode');
+    const transientMode = document.getElementById('transient-mode');
+    const freqConfig = document.getElementById('freq-config');
+    const transientConfig = document.getElementById('transient-config');
+    const chartContainer = document.getElementById('chart-container');
+    
+    dcMode.addEventListener('click', () => {
+        dcMode.classList.add('active');
+        acMode.classList.remove('active');
+        transientMode.classList.remove('active');
+        freqConfig.classList.add('hidden');
+        transientConfig.classList.add('hidden');
+        chartContainer.classList.add('hidden');
+        if (window.chartInstance) { window.chartInstance.destroy(); window.chartInstance = null; }
+        renderer.lastSolveResults = null;
+        clearResults();
+        renderer.render();
+    });
+    
+    acMode.addEventListener('click', () => {
+        acMode.classList.add('active');
+        dcMode.classList.remove('active');
+        transientMode.classList.remove('active');
+        freqConfig.classList.remove('hidden');
+        transientConfig.classList.add('hidden');
+        chartContainer.classList.add('hidden');
+        if (window.chartInstance) { window.chartInstance.destroy(); window.chartInstance = null; }
+        renderer.lastSolveResults = null;
+        clearResults();
+        renderer.render();
+    });
+
+    transientMode.addEventListener('click', () => {
+        transientMode.classList.add('active');
+        dcMode.classList.remove('active');
+        acMode.classList.remove('active');
+        freqConfig.classList.add('hidden');
+        transientConfig.classList.remove('hidden');
+        chartContainer.classList.remove('hidden');
+        renderer.lastSolveResults = null;
+        clearResults();
+        renderer.render();
+    });
+
+    // Save JSON
+    document.getElementById('save-json-btn').addEventListener('click', () => {
+        const payload = {
+            components: renderer.components,
+            nodes: renderer.nodes,
+            wires: renderer.wires
+        };
+        const jsonStr = JSON.stringify(payload, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = url;
+        downloadAnchor.download = `devre_tasarimi_${Date.now()}.json`;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
+        URL.revokeObjectURL(url);
+    });
+
+    // Load JSON
+    const fileInput = document.getElementById('json-file-input');
+    document.getElementById('load-json-btn').addEventListener('click', () => {
+        fileInput.click();
+    });
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const parsed = JSON.parse(event.target.result);
+                if (parsed.components && parsed.nodes && parsed.wires) {
+                    renderer.components = parsed.components;
+                    renderer.nodes = parsed.nodes;
+                    renderer.wires = parsed.wires;
+                    renderer.lastNodeMap = null;
+                    renderer.lastSolveResults = null;
+                    if (window.chartInstance) {
+                        window.chartInstance.destroy();
+                        window.chartInstance = null;
+                    }
+                    renderer.render();
+                    clearResults();
+                } else {
+                    alert("Hata: Geçersiz dosya formatı.");
+                }
+            } catch (err) {
+                alert("JSON okuma hatası.");
+            }
+        };
+        reader.readAsText(file);
+        fileInput.value = ""; // Reset
+    });
+
+    // Export PNG
+    document.getElementById('export-png-btn').addEventListener('click', () => {
+        const svgElement = document.getElementById('schematic-svg');
+        const serializer = new XMLSerializer();
+        let svgString = serializer.serializeToString(svgElement);
+        
+        const isDark = document.body.classList.contains('dark-mode');
+        const bgColor = isDark ? '#161b22' : '#e9ecef';
+        const primaryColor = isDark ? '#00d2ff' : '#007bff';
+        const textColor = isDark ? '#e0e0e0' : '#212529';
+        const accentColor = isDark ? '#ff416c' : '#dc3545';
+        
+        const styleText = `
+            text { font-family: 'Outfit', sans-serif; fill: ${textColor}; }
+            .comp-symbol { stroke: ${primaryColor}; fill: none; stroke-width: 2px; }
+            .comp-text { fill: ${textColor}; font-size: 12px; }
+            .pin { fill: rgba(120, 120, 120, 0.2); stroke: rgba(120, 120, 120, 0.4); }
+            .node-point { fill: ${accentColor}; }
+            .node-label-svg { fill: ${textColor}; font-size: 10px; font-weight: bold; }
+            line, path { stroke: ${primaryColor}; stroke-width: 2.5px; fill: none; }
+        `;
+        const styleElement = `<style>${styleText}</style>`;
+        svgString = svgString.replace('</svg>', `${styleElement}</svg>`);
+
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const URL = window.URL || window.webkitURL || window;
+        const blobURL = URL.createObjectURL(svgBlob);
+        
+        const image = new Image();
+        image.onload = () => {
+            const canvas = document.createElement('canvas');
+            const rect = svgElement.getBoundingClientRect();
+            canvas.width = rect.width || 800;
+            canvas.height = rect.height || 600;
+            const context = canvas.getContext('2d');
+            
+            context.fillStyle = bgColor;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0);
+            
+            const pngURL = canvas.toDataURL('image/png');
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", pngURL);
+            downloadAnchor.setAttribute("download", `devre_semasi_${Date.now()}.png`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            document.body.removeChild(downloadAnchor);
+            
+            URL.revokeObjectURL(blobURL);
+        };
+        image.src = blobURL;
     });
     
     // Theme Toggle (re-applied logic)
@@ -747,6 +1099,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             document.body.classList.remove('dark-mode');
             themeToggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+        }
+
+        // Dynamically update active chart colors if it exists
+        if (window.chartInstance) {
+            const isDarkTheme = (theme === 'dark');
+            const textCol = isDarkTheme ? '#e0e0e0' : '#212529';
+            const gridCol = isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+
+            window.chartInstance.options.scales.x.title.color = textCol;
+            window.chartInstance.options.scales.x.ticks.color = textCol;
+            window.chartInstance.options.scales.x.grid.color = gridCol;
+
+            window.chartInstance.options.scales.y.title.color = textCol;
+            window.chartInstance.options.scales.y.ticks.color = textCol;
+            window.chartInstance.options.scales.y.grid.color = gridCol;
+
+            window.chartInstance.options.plugins.legend.labels.color = textCol;
+            window.chartInstance.update();
         }
     };
     applyTheme(savedTheme);
@@ -794,7 +1164,9 @@ function updateSidebarComponentList(components) {
         'C': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="22" y2="12"></line><line x1="10" y1="6" x2="10" y2="18"></line><line x1="14" y1="6" x2="14" y2="18"></line></svg>',
         'L': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3a3 3 0 0 1 6 0a3 3 0 0 1 6 0h3"></path></svg>',
         'V': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="10" y1="10" x2="14" y2="10"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>',
-        'I': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="16" x2="12" y2="8"></line><polyline points="9 11 12 8 15 11"></polyline></svg>'
+        'I': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="16" x2="12" y2="8"></line><polyline points="9 11 12 8 15 11"></polyline></svg>',
+        'D': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 6 14 12 6 18"></polygon><line x1="14" y1="6" x2="14" y2="18"></line></svg>',
+        'OP': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 4 16 12 4 20"></polygon></svg>'
     };
     list.innerHTML = components.map(c => `
         <div class="sidebar-comp-item" 
@@ -805,7 +1177,7 @@ function updateSidebarComponentList(components) {
             <div class="sidebar-comp-icon">${typeIcons[c.type] || '⚙️'}</div>
             <div class="sidebar-comp-info">
                 <span class="sidebar-comp-name">${c.name}</span>
-                <span class="sidebar-comp-val">${c.value}</span>
+                <span class="sidebar-comp-val">${c.value || 'Aktif'}</span>
             </div>
         </div>
     `).join('');
@@ -821,7 +1193,222 @@ function parseValue(valStr) {
     return parseFloat(valStr);
 }
 
+function plotTransient(data) {
+    const resultsContent = document.getElementById('results-content');
+    const ctx = document.getElementById('osc-chart').getContext('2d');
+    if (window.chartInstance) {
+        window.chartInstance.destroy();
+    }
+    
+    const timePoints = data.time_points;
+    const voltages = data.voltages;
+    
+    // Prepare datasets
+    const datasets = [];
+    const colors = [
+        '#00f0ff', // Cyanish
+        '#ff007f', // Rose/Neon pink
+        '#39ff14', // Neon Green
+        '#ffad00', // Orange
+        '#8b00ff', // Violet
+        '#ffea00'  // Yellow
+    ];
+    let colorIdx = 0;
+    
+    // Object to store measurement statistics for each node
+    const stats = {};
+    
+    for (const [node, pts] of Object.entries(voltages)) {
+        if (node === '0') continue; // Ground is always 0V
+        datasets.push({
+            label: `Düğüm ${node}`,
+            data: pts,
+            borderColor: colors[colorIdx % colors.length],
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        });
+        colorIdx++;
+        
+        // Calculate statistics
+        const maxV = Math.max(...pts);
+        const minV = Math.min(...pts);
+        const vpp = maxV - minV;
+        
+        const sumSq = pts.reduce((acc, val) => acc + val*val, 0);
+        const vrms = Math.sqrt(sumSq / pts.length);
+        const meanV = pts.reduce((acc, val) => acc + val, 0) / pts.length;
+        
+        // Frequency estimation using mean crossings
+        let freq = 0;
+        if (vpp > 0.05) { // Only estimate for non-flat signals
+            const mean = meanV;
+            let crossings = [];
+            for (let i = 1; i < pts.length; i++) {
+                const prev = pts[i-1] - mean;
+                const curr = pts[i] - mean;
+                if (prev * curr < 0) {
+                    const t = timePoints[i-1] + (timePoints[i] - timePoints[i-1]) * (Math.abs(prev) / (Math.abs(prev) + Math.abs(curr)));
+                    crossings.push(t);
+                }
+            }
+            if (crossings.length >= 2) {
+                let periods = [];
+                for (let i = 2; i < crossings.length; i += 2) {
+                    periods.push(crossings[i] - crossings[i-2]);
+                }
+                const avgPeriod = periods.length > 0 ? 
+                    (periods.reduce((a,b)=>a+b, 0) / periods.length) : 
+                    (2 * (crossings[1] - crossings[0]));
+                freq = avgPeriod > 0 ? 1 / avgPeriod : 0;
+            }
+        }
+        
+        stats[node] = { maxV, minV, vpp, vrms, freq, meanV };
+    }
+    
+    const isDark = document.body.classList.contains('dark-mode');
+    const chartTextColor = isDark ? '#e0e0e0' : '#212529';
+    const chartGridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+
+    window.chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timePoints.map(t => t.toFixed(5)),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: { display: true, text: 'Zaman (sn)', color: chartTextColor },
+                    grid: { color: chartGridColor },
+                    ticks: { color: chartTextColor, maxTicksLimit: 10 }
+                },
+                y: {
+                    title: { display: true, text: 'Gerilim (V)', color: chartTextColor },
+                    grid: { color: chartGridColor },
+                    ticks: { color: chartTextColor }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: chartTextColor }
+                }
+            }
+        }
+    });
+    
+    // Build DRC Warnings panel if any
+    let drcHtml = "";
+    if (renderer.drcWarnings && renderer.drcWarnings.length > 0) {
+        drcHtml += `<div class="drc-panel">`;
+        drcHtml += `<h4 style="color: #ef4444; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01"></svg>
+            Tasarım Kuralı Denetimi (DRC)
+        </h4>`;
+        renderer.drcWarnings.forEach(w => {
+            const color = w.type === 'short_circuit' ? '#ef4444' : '#eab308';
+            drcHtml += `<div class="drc-item" style="border-left: 3px solid ${color};">
+                ${w.message}
+            </div>`;
+        });
+        drcHtml += `</div>`;
+    }
+    
+    // Build Osiloskop Measurements HTML
+    let oscMetricsHtml = `<h3 class="result-section-title">Osiloskop Ölçümleri</h3>`;
+    for (const [node, m] of Object.entries(stats)) {
+        const freqText = m.freq > 0 ? (m.freq >= 1000 ? `${(m.freq/1000).toFixed(2)} kHz` : `${m.freq.toFixed(1)} Hz`) : "DC / 0 Hz";
+        
+        // Compute additional metrics
+        const meanV = m.meanV;
+        const crestFactor = m.vrms > 0.01 ? (Math.max(Math.abs(m.maxV), Math.abs(m.minV)) / m.vrms) : 1.0;
+        const color = colors[(parseInt(node)-1) % colors.length] || '#00f0ff';
+        
+        oscMetricsHtml += `
+            <div class="node-section-header" style="margin-top: 1.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem;">
+                <h4 style="color: var(--primary); font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${color};"></span>
+                    Düğüm ${node} Sinyal Analizi
+                </h4>
+            </div>
+            
+            <div class="node-card" style="border-left: 4px solid var(--primary); margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Tepeden Tepeye Gerilim (Vpp)</h4>
+                    <span class="node-usage">Sinyalin maksimum ve minimum voltaj seviyeleri arasındaki tepe farkı</span>
+                </div>
+                <span class="val">${m.vpp.toFixed(3)} V</span>
+            </div>
+
+            <div class="node-card" style="border-left: 4px solid var(--secondary); margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Etkin Gerilim Değeri (Vrms)</h4>
+                    <span class="node-usage">Dalga formunun alternatif akımdaki efektif voltaj karşılığı</span>
+                </div>
+                <span class="val">${m.vrms.toFixed(3)} V</span>
+            </div>
+
+            <div class="node-card" style="border-left: 4px solid var(--accent); margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Maksimum Potansiyel (Vmax)</h4>
+                    <span class="node-usage">Sinyalin ulaştığı tepe pozitif genlik seviyesi</span>
+                </div>
+                <span class="val">${m.maxV.toFixed(3)} V</span>
+            </div>
+
+            <div class="node-card" style="border-left: 4px solid #8b00ff; margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Minimum Potansiyel (Vmin)</h4>
+                    <span class="node-usage">Sinyalin ulaştığı dip negatif/sıfır genlik seviyesi</span>
+                </div>
+                <span class="val">${m.minV.toFixed(3)} V</span>
+            </div>
+
+            <div class="node-card" style="border-left: 4px solid #ffad00; margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Sinyal Frekansı (f)</h4>
+                    <span class="node-usage">Sinyalin saniyedeki periyodik salınım frekansı</span>
+                </div>
+                <span class="val" style="font-size: 1rem;">${freqText}</span>
+            </div>
+
+            <div class="node-card" style="border-left: 4px solid #00f0ff; margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Ortalama Gerilim (DC Offset)</h4>
+                    <span class="node-usage">Sinyalin sıfır referansına göre ortalama DC kayması</span>
+                </div>
+                <span class="val">${meanV.toFixed(3)} V</span>
+            </div>
+
+            <div class="node-card" style="border-left: 4px solid #ff007f; margin-bottom: 0.5rem; cursor: default;">
+                <div class="node-info-main">
+                    <h4>Tepe Faktörü (Crest Factor)</h4>
+                    <span class="node-usage">Maksimum genliğin etkin değere oranı (Sinyalin sivrilik derecesi)</span>
+                </div>
+                <span class="val">${crestFactor.toFixed(3)}</span>
+            </div>
+        `;
+    }
+    
+    resultsContent.innerHTML = drcHtml + `
+        <div class="summary-card" style="margin-bottom: 15px;">
+            <h4>Osiloskop Simülasyon Raporu</h4>
+            <span class="summary-val">${timePoints[timePoints.length-1].toFixed(4)} Saniye</span>
+            <span class="summary-note">Simülasyon toplam ${timePoints.length} veri noktasında hesaplandı.</span>
+        </div>
+    ` + oscMetricsHtml;
+}
+
 function displayResults(data) {
+    if (data.time_points) {
+        plotTransient(data);
+        return;
+    }
+
     const resultsContent = document.getElementById('results-content');
     const components = renderer.getMNAComponents();
     const voltages = data.voltages;
@@ -835,8 +1422,10 @@ function displayResults(data) {
     // Components Section
     html += `<h3 class="result-section-title">Eleman Analizi</h3>`;
     components.forEach(c => {
-        const v1 = voltages[c.n1]?.mag || 0;
-        const v2 = voltages[c.n2]?.mag || 0;
+        const v1Info = voltages[c.n1];
+        const v2Info = voltages[c.n2];
+        const v1 = v1Info ? (v1Info.mag !== undefined ? v1Info.mag : Math.abs(v1Info.real || v1Info || 0)) : 0;
+        const v2 = v2Info ? (v2Info.mag !== undefined ? v2Info.mag : Math.abs(v2Info.real || v2Info || 0)) : 0;
         const vDrop = v1 - v2;
         
         let i = 0;
@@ -854,9 +1443,6 @@ function displayResults(data) {
             explanation = `Bu direnç üzerinden ${i.toFixed(4)}A akım akıyor. ${p.toFixed(4)}W enerjiyi ısıya dönüştürüyor.`;
         } else if (c.type === 'V') {
             const srcCurrent = currents[c.name]?.real || 0;
-            // Power delivered by voltage source: P = V * I_source
-            // In MNA, I_source is into n1. So P = -V * I_source if it delivers?
-            // Let's use magnitude for simplicity in "beginner mode" but check direction
             i = Math.abs(srcCurrent);
             p = Math.abs(parseValue(c.value) * i);
             status = "delivering";
@@ -916,6 +1502,7 @@ function displayResults(data) {
         const isGnd = node === '0';
         const displayName = isGnd ? "Referans (GND)" : `Düğüm ${node}`;
         const cardClass = isGnd ? "node-card gnd" : "node-card";
+        const val = info ? (info.mag !== undefined ? info.mag : (info.real || info || 0)) : 0;
         
         nodesHtml += `
             <div class="${cardClass}" 
@@ -925,12 +1512,28 @@ function displayResults(data) {
                     <h4>${displayName}</h4>
                     <span class="node-usage">${isGnd ? "0V Referans Noktası" : "Ölçülen Potansiyel"}</span>
                 </div>
-                <span class="val">${info.mag.toFixed(3)} V</span>
+                <span class="val">${val.toFixed(3)} V</span>
             </div>
         `;
     }
 
-    resultsContent.innerHTML = summaryHtml + nodesHtml + html;
+    let drcHtml = "";
+    if (renderer.drcWarnings && renderer.drcWarnings.length > 0) {
+        drcHtml += `<div class="drc-panel">`;
+        drcHtml += `<h4 style="color: #ef4444; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01"></svg>
+            Tasarım Kuralı Denetimi (DRC)
+        </h4>`;
+        renderer.drcWarnings.forEach(w => {
+            const color = w.type === 'short_circuit' ? '#ef4444' : '#eab308';
+            drcHtml += `<div class="drc-item" style="border-left: 3px solid ${color};">
+                ${w.message}
+            </div>`;
+        });
+        drcHtml += `</div>`;
+    }
+
+    resultsContent.innerHTML = drcHtml + summaryHtml + nodesHtml + html;
 }
 
 function clearResults() {

@@ -53,13 +53,17 @@ def solve_circuit():
     try:
         circuit = Circuit()
         freq = data.get('frequency', 0)
+        mode = data.get('mode', 'steady')
         
         for comp in data.get('components', []):
             ctype = comp['type']
             name = comp['name']
             n1 = str(comp['n1'])
             n2 = str(comp['n2'])
-            val = parse_value(comp['value'])
+            
+            # Diodes might not require a value
+            val_str = comp.get('value', '0')
+            val = parse_value(val_str) if val_str else 0.0
             
             if ctype == 'R':
                 circuit.add_resistor(name, n1, n2, val)
@@ -73,7 +77,23 @@ def solve_circuit():
             elif ctype == 'I':
                 phase = float(comp.get('phase', 0))
                 circuit.add_i_source(name, n1, n2, val, phase)
+            elif ctype == 'D':
+                circuit.add_diode(name, n1, n2)
+            elif ctype == 'OP':
+                n3 = str(comp['n3'])
+                circuit.add_opamp(name, n1, n2, n3)
         
+        if mode == 'transient':
+            t_stop = float(data.get('t_stop', 0.01))
+            t_step = float(data.get('t_step', 0.0001))
+            time_points, history, current_history = circuit.solve_transient(t_stop, t_step, freq=freq)
+            return jsonify({
+                'mode': 'transient',
+                'time_points': time_points,
+                'voltages': history,
+                'currents': current_history
+            })
+            
         results = circuit.solve(freq=freq)
         
         if isinstance(results, str): # Error message
@@ -116,6 +136,7 @@ def solve_circuit():
                 }
         
         return jsonify({
+            'mode': 'steady',
             'voltages': resp_voltages,
             'currents': resp_currents
         })
@@ -126,9 +147,10 @@ def solve_circuit():
         translations = {
             "could not convert string to float": "Geçersiz sayısal değer girildi",
             "is not in list": "eleman listede bulunamadı",
-            "Matrix is singular": "Matris tekil (devre tamamlanmamış olabilir)",
+            "Matrix is singular": "Matris tekil (devre tamamlanmamış veya topraklanmamış olabilir)",
             "n1": "n1 bağlantısı eksik",
             "n2": "n2 bağlantısı eksik",
+            "n3": "n3 bağlantısı eksik",
             "value": "değer alanı eksik"
         }
         for eng, tr in translations.items():
