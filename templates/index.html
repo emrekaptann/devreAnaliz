@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d2ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='13 2 3 14 12 14 11 22 21 10 12 10 13 2' fill='%2300d2ff'/%3E%3C/svg%3E">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Devre Analiz - Pro Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,6 +24,14 @@
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
                 <h1>Devre<span>Analiz</span></h1>
+                <button id="help-btn" class="theme-toggle" title="Yardım ve Kısayollar" style="margin-left: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </button>
             </div>
             <div class="user-info">2003240044 ABDURRAHİM EMRE KAPTAN</div>
             <div class="top-controls">
@@ -37,6 +46,7 @@
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                     </svg>
                 </button>
+
                 <button id="solve-btn" class="solve-btn pulse">Hesapla</button>
             </div>
         </header>
@@ -293,10 +303,39 @@
                 <label>Faz (°)</label>
                 <input type="number" id="edit-phase">
             </div>
-            <div class="modal-actions">
+            <div class="modal-actions" style="grid-template-columns: 1fr 1fr 1fr;">
                 <button id="modal-delete" class="delete-btn">Sil</button>
+                <button id="modal-rotate" class="save-btn" style="background: var(--secondary);" title="Elemanı 90 derece döndür">Döndür (R)</button>
                 <button id="modal-save" class="save-btn">Kaydet</button>
-                <button id="modal-close" class="close-btn">Kapat</button>
+                <button id="modal-close" class="close-btn" style="grid-column: span 3;">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content glass" style="width: 500px; max-width: 90%;">
+            <h3 style="color: var(--primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Kullanım Kılavuzu & Kısayollar
+            </h3>
+            <div style="font-size: 0.9rem; line-height: 1.6; color: var(--text);">
+                <p style="margin-bottom: 1rem;"><strong>DevreAnaliz</strong> uygulamasını kullanmak için temel adımlar:</p>
+                <ul style="margin-left: 1.2rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 8px;">
+                    <li><strong>Eleman Ekleme:</strong> Sol menüdeki elemanları tuvale <strong>sürükleyip bırakarak</strong> ekleyebilirsiniz.</li>
+                    <li><strong>Bağlantı Kurma (Kablo):</strong> Bir elemanın bağlantı pinine (fareyle üzerine gelindiğinde çıkan + işareti) tıklayarak kablo çizimini otomatik başlatabilir veya sol araç kutusundan <strong>Kablo (Jumper)</strong> butonunu aktif edebilirsiniz. Ardından hedef pine tıklayarak bağlantıyı tamamlayın.</li>
+                    <li><strong>Eleman Düzenleme / Silme:</strong> Tuvaldeki herhangi bir elemana tıklayarak değerini değiştirebilir, silebilir veya yönünü döndürebilirsiniz.</li>
+                    <li><strong>Çoklu Seçim & Taşıma:</strong> Boş alana tıklayıp sürükleyerek birden fazla elemanı seçebilirsiniz. Seçili elemanları sürükleyerek taşıyabilirsiniz.</li>
+                </ul>
+                <h4 style="margin-top: 1.2rem; margin-bottom: 0.5rem; color: var(--secondary);">Klavye Kısayolları</h4>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem;">
+                    <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; width: 120px;"><strong>R / r</strong></td><td style="padding: 6px 0;">Seçili elemanı 90° döndürür.</td></tr>
+                    <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0;"><strong>Delete / Backspace</strong></td><td style="padding: 6px 0;">Seçili eleman veya kabloları siler.</td></tr>
+                    <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0;"><strong>Shift + Tık</strong></td><td style="padding: 6px 0;">Çoklu seçime eleman ekler.</td></tr>
+                </table>
+            </div>
+            <div class="modal-actions" style="grid-template-columns: 1fr; margin-top: 1rem;">
+                <button id="help-modal-close" class="close-btn">Anladım, Kapat</button>
             </div>
         </div>
     </div>

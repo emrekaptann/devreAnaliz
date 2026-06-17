@@ -53,6 +53,10 @@ class SchematicRenderer {
 
         if (!type) return;
 
+        this.addComponent(type, x, y);
+    }
+
+    addComponent(type, x, y) {
         const compId = Date.now();
         let n1, n2, n3 = null;
 
@@ -87,6 +91,7 @@ class SchematicRenderer {
             n1: n1,
             n2: n2,
             phase: 0,
+            rot: 0,
             x: x,
             y: y
         };
@@ -95,6 +100,51 @@ class SchematicRenderer {
         }
 
         this.components.push(newComp);
+        this.render();
+        return newComp;
+    }
+
+    rotateComponent(comp, angleOffset = 90) {
+        if (!comp) return;
+        
+        comp.rot = ((comp.rot || 0) + angleOffset) % 360;
+        if (comp.rot < 0) comp.rot += 360;
+
+        const rad = comp.rot * Math.PI / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        if (comp.type === 'OP') {
+            const p1 = { dx: -40, dy: -20 };
+            const p2 = { dx: -40, dy: 20 };
+            const p3 = { dx: 40, dy: 0 };
+
+            if (this.nodes[comp.n1]) {
+                this.nodes[comp.n1].x = comp.x + Math.round(p1.dx * cos - p1.dy * sin);
+                this.nodes[comp.n1].y = comp.y + Math.round(p1.dx * sin + p1.dy * cos);
+            }
+            if (this.nodes[comp.n2]) {
+                this.nodes[comp.n2].x = comp.x + Math.round(p2.dx * cos - p2.dy * sin);
+                this.nodes[comp.n2].y = comp.y + Math.round(p2.dx * sin + p2.dy * cos);
+            }
+            if (comp.n3 && this.nodes[comp.n3]) {
+                this.nodes[comp.n3].x = comp.x + Math.round(p3.dx * cos - p3.dy * sin);
+                this.nodes[comp.n3].y = comp.y + Math.round(p3.dx * sin + p3.dy * cos);
+            }
+        } else {
+            const p1 = { dx: -40, dy: 0 };
+            const p2 = { dx: 40, dy: 0 };
+
+            if (this.nodes[comp.n1]) {
+                this.nodes[comp.n1].x = comp.x + Math.round(p1.dx * cos - p1.dy * sin);
+                this.nodes[comp.n1].y = comp.y + Math.round(p1.dx * sin + p1.dy * cos);
+            }
+            if (this.nodes[comp.n2]) {
+                this.nodes[comp.n2].x = comp.x + Math.round(p2.dx * cos - p2.dy * sin);
+                this.nodes[comp.n2].y = comp.y + Math.round(p2.dx * sin + p2.dy * cos);
+            }
+        }
+
         this.render();
     }
 
@@ -192,7 +242,8 @@ class SchematicRenderer {
                 type: c.type, 
                 name: `${c.name}${this.components.length + idx + 1}`, 
                 value: c.val, 
-                n1, n2, x: cx, y: cy, phase: 0 
+                n1, n2, x: cx, y: cy, phase: 0,
+                rot: c.rot || 0
             };
         });
 
@@ -354,6 +405,10 @@ class SchematicRenderer {
     }
 
     handleKeyDown(e) {
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT' || document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
+
         if (e.key === 'Delete' || e.key === 'Backspace') {
             let changed = false;
             
@@ -369,6 +424,20 @@ class SchematicRenderer {
             }
 
             if (changed) {
+                this.lastNodeMap = null;
+                this.render();
+                clearResults();
+            }
+        }
+
+        if (e.key === 'r' || e.key === 'R') {
+            if (this.selectedIds.size > 0) {
+                this.selectedIds.forEach(id => {
+                    const comp = this.components.find(c => c.id === id);
+                    if (comp) {
+                        this.rotateComponent(comp, 90);
+                    }
+                });
                 this.lastNodeMap = null;
                 this.render();
                 clearResults();
@@ -605,7 +674,7 @@ class SchematicRenderer {
     }
 
     drawComponent(c, p1, p2) {
-        let angle = 0;
+        let angle = c.rot || 0;
         let midX = c.x;
         let midY = c.y;
         
@@ -705,7 +774,13 @@ class SchematicRenderer {
             // Direct click handler for wiring - bypasses delegation issues
             pin.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (!this.isWiring) return;
+                if (!this.isWiring) {
+                    this.isWiring = true;
+                    const wireTool = document.getElementById('wire-tool');
+                    if (wireTool) {
+                        wireTool.classList.add('active');
+                    }
+                }
                 if (!this.wireStartNode) {
                     this.wireStartNode = nodeId;
                     this.render();
@@ -849,6 +924,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('edit-modal');
     const saveBtn = document.getElementById('modal-save');
     const deleteBtn = document.getElementById('modal-delete');
+    const rotateBtn = document.getElementById('modal-rotate');
     const closeBtn = document.getElementById('modal-close');
 
     saveBtn.addEventListener('click', () => {
@@ -870,12 +946,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    if (rotateBtn) {
+        rotateBtn.addEventListener('click', () => {
+            if (compToEdit) {
+                renderer.rotateComponent(compToEdit, 90);
+            }
+        });
+    }
+
     closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Help Modal Events
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const helpCloseBtn = document.getElementById('help-modal-close');
+    
+    if (helpBtn && helpModal && helpCloseBtn) {
+        helpBtn.addEventListener('click', () => {
+            helpModal.classList.remove('hidden');
+        });
+        helpCloseBtn.addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+        });
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.add('hidden');
+            }
+        });
+    }
 
     // Solve
     document.getElementById('solve-btn').addEventListener('click', async () => {
         const mnaComps = renderer.getMNAComponents();
-        if (mnaComps.length === 0) return;
+        if (mnaComps.length === 0) {
+            showToast("Lütfen hesaplamadan önce devre elemanlarını yerleştirin.", "warning");
+            return;
+        }
 
         let mode = 'steady';
         if (document.getElementById('transient-mode').classList.contains('active')) {
@@ -1545,4 +1651,41 @@ function clearResults() {
             <p>Sonuçlar burada görünecek.</p>
         </div>
     `;
+}
+
+function showToast(message, type = "info") {
+    let toast = document.getElementById('app-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-toast';
+        toast.className = 'toast-container';
+        document.body.appendChild(toast);
+    }
+    
+    toast.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>${message}</span>
+    `;
+    
+    toast.className = 'toast-container';
+    if (type === "warning") {
+        toast.classList.add('toast-warning');
+    }
+    
+    // Trigger reflow
+    toast.offsetHeight;
+    
+    toast.classList.add('show');
+    
+    if (window.toastTimeout) {
+        clearTimeout(window.toastTimeout);
+    }
+    
+    window.toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
 }
